@@ -5,13 +5,15 @@ Created on Thu Nov  2 09:57:12 2023
 @author: Ignacio Carvajal
 """
 
+from georef import *
 import numpy as np
-import pandas as pd
 import folium
-import pandas as pd
 import xlsxwriter
+import openpyxl
+import os
+import webbrowser
 
-def verificar_elemento_mayor( lista, numero):
+def verificar_elemento_mayor(lista, numero):
     if len(lista) > 0:
         for elemento in lista:
             if elemento > numero:
@@ -24,53 +26,81 @@ def condicion(camiones, camion, cluster_sums, n_clusters):
     capacidad = len([x for x in cluster_sums if x <= camiones[camion].capacidad and x >= camiones[camion].sub_capacidad]) <= camiones[camion].vueltas and verificar_elemento_mayor(n_clusters, camiones[camion].maximo_entregas)
     return capacidad and cantidad_de_entregas
 
+def condicion_compuesta(camiones, cluster_sums, n_clusters):
+    proposicion = True
+    for camion in camiones.keys():
+        proposicion = proposicion and condicion(camiones, camion, cluster_sums, n_clusters)
+        #if proposicion == False:
+            #print(proposicion, camion)
+        #print(proposicion)
+        #print(camion)
+    return proposicion
 
 class Camion:
-    def __init__(self, capacidad, sub_capacidad, vueltas,maximo_entregas):
+    def __init__(self, capacidad, sub_capacidad, vueltas, maximo_entregas):
         self.capacidad = capacidad
         self.sub_capacidad = sub_capacidad
         self.vueltas = vueltas
         self.maximo_entregas = maximo_entregas
+    
+    def __str__(self):
+        return f"({self.capacidad}, {self.sub_capacidad}, {self.vueltas}, {self.maximo_entregas})"
 
 class Entregas:
-    def __init__(self, nombre_archivo):
-        self.nombre_archivo = nombre_archivo
-        self.camiones = {
-            "sinotrack": Camion(16, 6, 3, 7),
-            "jak": Camion(26, 16, 1, 7),
-            "hyundai": Camion(6, 0, 1, 7),
-            "externo_1": Camion(22, 16, 2, 7)
+    # Ahora entregas no utiliza nombre de archivo, recibe df directamente
+    def __init__(self):
+        # self.nombre_archivo = nombre_archivo
+        self.camiones = {"Sinotrack": Camion(28, 22, 2, 7),
+                    "JAK": Camion(18, 6, 2, 7),
+                    "Hyundai": Camion(8, 0, 1, 7),
+                    "Externo_1": Camion(22, 18,2,7),
+                    "Externo_2": Camion(22, 18,2,7)
         }
 
-    def cargar_datos(self):
-        df = pd.read_excel(self.nombre_archivo)
-        df = df[df["FECHA ENTREGA"] == "16-10-2023"]
-        df = df[df["latitudes"] != -33.464161]
-        latitudes = df["latitudes"]
-        longitudes = df["longitudes"]
+    # La función ahora retorna True o False dependiendo de si se pudo agregar el camión 
+    def crear_camion(self, nombre, capacidad, sub_capacidad, vueltas, maximo_entregas):
+        if nombre in self.camiones.keys():
+            return False
+        self.camiones[nombre] = Camion(capacidad, sub_capacidad, vueltas,maximo_entregas)
+        return True
 
-        if len(latitudes) == len(longitudes) == len(list(df["VOLUMEN"])):
-            latitudes = np.array(df["latitudes"])
-            longitudes = np.array(df["longitudes"])
-            volumen = np.array(list(df["VOLUMEN"]))
+    # Por ahora trabajamos con xlsx, idealmente seria query a base de datos.
+    # Se recibe solo el df ya filtrado pues el xlsx/query fue procesado en procesar_datos.py
+    def cargar_datos(self, df_filtrado):
+        # existe FECHA_SOLICITUD_DESPACHO y FECHA_PROG_DESPACHO
+        #df = df[df["FECHA_SOLICITUD_DESPACHO"].str[:12] == fecha]
+
+        # Ahora el DataFrame incluira latitud y longitud de acuerdo a las direcciones
+        #df = pasar_a_coordenadas(df, test_prints=True)
+        
+        #df = df[df["latitudes"] != -33.464161]
+        latitudes = df_filtrado["LATITUD"]
+        longitudes = df_filtrado["LONGITUD"]
+
+        if len(latitudes) == len(longitudes) == len(list(df_filtrado["VOLUMEN"])):
+            latitudes = np.array(df_filtrado["LATITUD"])
+            longitudes = np.array(df_filtrado["LONGITUD"])
+            volumen = np.array(list(df_filtrado["VOLUMEN"].astype(np.float64)))
             indices_eliminar = np.where(latitudes == 999)[0]
 
             latitudes = [latitudes[i] for i in range(len(latitudes)) if i not in indices_eliminar]
             longitudes = [longitudes[i] for i in range(len(longitudes)) if i not in indices_eliminar]
             volumen = [volumen[i] for i in range(len(volumen)) if i not in indices_eliminar]
-            n_servicio = df["SERVICIO"]
+            n_servicio = df_filtrado["SERVICIO"].astype(np.float64)
 
             self.array_tridimensional = np.array([latitudes, longitudes, volumen, n_servicio]).T
+            
         else:
             print("Las listas no tienen la misma longitud, no se pueden combinar en un array tridimensional.")
 
+       
 
-
-    def kmeans_with_constraint(self, K, max_iters=100, constraint_value=26):
+    def kmeans_with_constraint(self, K, max_iters=300, constraint_value=28):
         best_centroids = None
         best_labels = None
 
         for _ in range(max_iters):
+            
             centroids = self.array_tridimensional[np.random.choice(len(self.array_tridimensional), K, replace=False)]
 
             for _ in range(max_iters):
@@ -82,8 +112,8 @@ class Entregas:
                 n_clusters = [len(self.array_tridimensional[labels == k][:, 2]) for k in range(K)]
                 #factibilidad = self.condicion(cluster_sums) and self.verificar_elemento_mayor(n_clusters, 6)
                 #factibilidad = condicion(camiones, "sinotrack", cluster_sums) and condicion(camiones, "jak", cluster_sums) and condicion(camiones, "hyundai", cluster_sums) and condicion(camiones, "externo_1", cluster_sums) and np.all(cluster_sums <= constraint_value)
-                factibilidad = condicion(self.camiones, "sinotrack", cluster_sums, n_clusters) and condicion(self.camiones, "jak", cluster_sums, n_clusters) and condicion(self.camiones, "hyundai", cluster_sums, n_clusters) and condicion(self.camiones, "externo_1", cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
-                
+                #factibilidad = condicion(self.camiones, "Sinotrack", cluster_sums, n_clusters) and condicion(self.camiones, "JAK", cluster_sums, n_clusters) and condicion(self.camiones, "Hyundai", cluster_sums, n_clusters) and condicion(self.camiones, "Externo_1", cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
+                factibilidad = condicion_compuesta(self.camiones, cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
                 if factibilidad:
                     best_centroids = centroids
                     best_labels = labels
@@ -97,8 +127,8 @@ class Entregas:
 
         return best_centroids, best_labels
 
-    def condicion(self, cluster_sums):
-        return all(cluster_sums <= 26)
+    #def condicion(self, cluster_sums):
+      #  return all(cluster_sums <= 26)
 
     def sumar_vueltas(self):
         total_vueltas = 0
@@ -111,7 +141,7 @@ class Entregas:
         colores_clusters = ['red', 'green', 'blue', 'white', 'darkred', 'orange', 'purple', 'pink', 'yellow', 'brown', 'cyan', 'gray', 'magenta', 'teal', 'lime']
 
         folium.Marker(
-            location=[-33.4116806, -70.9097788],
+            location=[-33.421845,-70.9183415],
             icon=folium.Icon(color='purple'),
             popup="Punto Específico"
         ).add_to(mapa_santiago)
@@ -126,13 +156,14 @@ class Entregas:
             ).add_to(mapa_santiago)
 
         mapa_santiago.save(f"mapas/mapa_{j}_Rutas.html")
+        print("Mapa Creado")
 
     def ejecutar_modelo(self):
         K = self.sumar_vueltas()
         K = 10
-        constraint_value = 26
-        for i in range(1, K):
-            centroids, labels = self.kmeans_with_constraint(i, constraint_value=constraint_value)
+        
+        for i in range(3, K):
+            centroids, labels = self.kmeans_with_constraint(i)
 
             if centroids is not None:
                 for k in range(i):
@@ -143,8 +174,6 @@ class Entregas:
                     print("Puntos en el cluster:", cluster_points)
                     print(f"Suma de la columna extra en el cluster: {cluster_sum}\n")
                     
-                    
-   
             try:
                 self.crear_mapa(self.array_tridimensional, labels, i)
                 
@@ -153,7 +182,8 @@ class Entregas:
 
             
             if centroids is not None:
-                workbook = xlsxwriter.Workbook(f'{i}_Ruta_info.xlsx')
+                directorio_actual = os.getcwd()
+                workbook = xlsxwriter.Workbook(directorio_actual + f'/rutas/{i}_Ruta_info.xlsx')
             
                 for k in range(i):
                     cluster_points = self.array_tridimensional[labels == k]
@@ -175,28 +205,32 @@ class Entregas:
                     info_worksheet.write(2, 1, cluster_sum)
             
                 workbook.close()
-                
-                
-            import openpyxl
-            
-
             
             if centroids is not None:
                 # Primero, crea el archivo Excel para guardar los datos del cluster.
-                workbook = xlsxwriter.Workbook(f'{i}_ruta_info.xlsx')
+                workbook = xlsxwriter.Workbook(directorio_actual + f'/rutas/{i}_ruta_info.xlsx')
                 for k in range(i):
                     cluster_points = self.array_tridimensional[labels == k]
                     cluster_sum = cluster_points[:, 2].sum()
+                    
+                    # Formatting para el archivo
+                    bold = workbook.add_format({
+                        'bold': True,
+                        'align': 'center',
+                    })
             
                     # Crea una nueva hoja para el cluster
                     worksheet = workbook.add_worksheet(f'Ruta_{k + 1}')
             
                     # Escribe los datos del cluster en la hoja
+                    nombres_columnas = ["LATITUD", "LONGITUD", "VOLUMEN", "N_SERVICIO"]
+                    worksheet.write_row(0, 0, nombres_columnas, bold)
                     for row_num, row_data in enumerate(cluster_points):
-                        worksheet.write_row(row_num, 0, row_data)
+                        # Formato es (fila, columna, datos)
+                        worksheet.write_row(row_num + 1, 0, row_data)
             
                     # Abre el archivo Excel "coordenadas.xlsx"
-                    wb = openpyxl.load_workbook('coordenadas.xlsx')
+                    wb = openpyxl.load_workbook(directorio_actual + f'/pedidos/coordenadas.xlsx')
                     sheet = wb.active
             
                     # Crea una nueva hoja en "coordenadas.xlsx" para los registros específicos del cluster
@@ -209,7 +243,7 @@ class Entregas:
                             cluster_sheet.append(row)
             
                     # Guarda el archivo "coordenadas.xlsx"
-                    wb.save('coordenadas6.xlsx')
+                    wb.save(directorio_actual + f'/pedidos/coordenadas6.xlsx')
             
                     # Agrega la información del centroide y suma al archivo Excel original
                     info_worksheet = workbook.add_worksheet(f'Ruta_{k + 1}_Info')
@@ -221,10 +255,3 @@ class Entregas:
             
                 workbook.close()
 
-
-
-
-if __name__ == "__main__":
-    entregas = Entregas("coordenadas.xlsx")
-    entregas.cargar_datos()
-    entregas.ejecutar_modelo()

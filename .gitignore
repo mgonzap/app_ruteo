@@ -1,5 +1,5 @@
-*.xlsx
-*.txt
+**/*.xlsx
+**/*.txt
 mapas/
 pedidos/
 rutas/

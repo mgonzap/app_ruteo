@@ -1,0 +1,7 @@
+*.xlsx
+*.txt
+mapas/
+pedidos/
+rutas/
+logo/
+base_datos.py

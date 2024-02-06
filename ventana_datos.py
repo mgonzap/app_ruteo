@@ -19,7 +19,7 @@ class VentanaDatos(QMainWindow):
         # TODO: ejecutar procesar_data de forma asincrona
         # pues el procesamiento de datos espera a que se cierre el dialogo para iniciar
         # self.generar_dialogo("Por favor espere, procesando los datos...")
-        self.recibir_datos(procesar_dataframe(procesar_query()))
+        self.recibir_datos(procesar_dataframe(procesar_query())[0])
         
         self.setWindowIcon(self.icono)
         self.setWindowTitle("Procesamiento de Datos")

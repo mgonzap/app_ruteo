@@ -18,7 +18,7 @@ def procesar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha = (date.today() + timedelta(days=1)).strftime('%d-%m-%Y')
+    fecha = (date.today() + timedelta(days=-14)).strftime('%d-%m-%Y')
     print("fecha a filtrar:", fecha)
 
     # existe FECHA_SOLICITUD_DESPACHO y FECHA_PROG_DESPACHO
@@ -36,7 +36,77 @@ def procesar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
     df = georef.pasar_a_coordenadas(df[df["DATOS TRANSPORTE EXTERNO"] != "TVP"], test_prints=True)
     
-    return df
+    capacidad_maxima_por_camion = 18
+    
+    for index, row in df.iterrows():
+        volumen_total = float(row['VOLUMEN'])
+        if volumen_total > capacidad_maxima_por_camion:
+            
+            bultos = int(row["N° BULTOS"])
+            peso_total = float(row["PESO"])
+            volumen_unidad_teorica = volumen_total/bultos
+            print(volumen_unidad_teorica)
+            peso_unidad_teorica = peso_total/bultos
+            
+            for bulto in range(bultos):
+                
+                if bulto*volumen_unidad_teorica > capacidad_maxima_por_camion:
+                    
+                    bultos_primera_entrega = bulto - 1
+                    
+                    volumen_primera_entrega = bultos_primera_entrega*volumen_unidad_teorica
+                   
+                    peso_primera_entrega = bultos_primera_entrega*peso_unidad_teorica
+                    
+                    
+                    df.loc[index, 'VOLUMEN'] = volumen_primera_entrega
+                    df.loc[index, "PESO"] = peso_primera_entrega
+                    df.loc[index, "N° BULTOS"] = bultos_primera_entrega 
+                
+                    
+                    
+                    bultos_segunda_entrega = bultos - bultos_primera_entrega
+                    #print(bultos, bultos_primera_entrega )
+                    volumen_segunda_entrega = bultos_segunda_entrega*volumen_unidad_teorica
+                    print(volumen_total, bultos_segunda_entrega*volumen_unidad_teorica)
+                    peso_segunda_entrega = bultos_segunda_entrega*peso_unidad_teorica
+                    break
+                
+            df.loc[index, 'VOLUMEN'] = volumen_segunda_entrega
+            df.loc[index, "PESO"] = peso_segunda_entrega
+            df.loc[index, "N° BULTOS"] = bultos_segunda_entrega
+            
+            entregas_de_un_camion = df.copy()
+            
+            nueva_fila = df.loc[index].copy()
+            
+            nueva_fila["VOLUMEN"]  = volumen_primera_entrega
+            nueva_fila["PESO"] = peso_primera_entrega
+            nueva_fila["N° BULTOS"] = bultos_primera_entrega 
+            """
+            nueva_fila["VOLUMEN"] = volumen_segunda_entrega
+            nueva_fila["PESO"] = peso_segunda_entrega
+            nueva_fila["N° BULTOS"] = bultos_segunda_entrega
+            """
+            nueva_fila["LATITUD"] = float(nueva_fila["LATITUD"]) 
+            nueva_fila["LONGITUD"] = float(nueva_fila["LONGITUD"]) 
+            
+            print(peso_primera_entrega)
+            print(peso_segunda_entrega)
+            print()
+            print(volumen_primera_entrega)
+            print(volumen_segunda_entrega)
+            print()
+            print(bultos_primera_entrega)
+            print(bultos_segunda_entrega)
+       
+            
+      
+            # Agregar la nueva fila al final del DataFrame usando loc
+            entregas_de_un_camion.loc[1] = nueva_fila
+        
+    print(df)
+    return df, entregas_de_un_camion
 
 def procesar_query() -> pd.DataFrame:
     """Ejecuta la query a la base de datos y la procesa en un DataFrame similar a los excel de despacho

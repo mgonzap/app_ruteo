@@ -12,7 +12,7 @@ import xlsxwriter
 import openpyxl
 import os
 import webbrowser
-
+import pandas as pd
 def verificar_elemento_mayor(lista, numero):
     if len(lista) > 0:
         for elemento in lista:
@@ -49,12 +49,13 @@ class Camion:
 class Entregas:
     # Ahora entregas no utiliza nombre de archivo, recibe df directamente
     def __init__(self):
+        
         # self.nombre_archivo = nombre_archivo
-        self.camiones = {"Sinotrack": Camion(28, 22, 2, 7),
-                    "JAK": Camion(18, 6, 2, 7),
-                    "Hyundai": Camion(8, 0, 1, 7),
-                    "Externo_1": Camion(22, 18,2,7),
-                    "Externo_2": Camion(22, 18,2,7)
+        self.camiones = {"Sinotrack": Camion(28, 22, 2, 10),
+                    "JAK": Camion(18, 8, 2, 10),
+                    "Hyundai": Camion(8, 0, 1, 10),
+                    "Externo_1": Camion(22, 18,2,10),
+                    "Externo_2": Camion(22, 18,4,10)
         }
 
     # La función ahora retorna True o False dependiendo de si se pudo agregar el camión 
@@ -72,7 +73,10 @@ class Entregas:
 
         # Ahora el DataFrame incluira latitud y longitud de acuerdo a las direcciones
         #df = pasar_a_coordenadas(df, test_prints=True)
-        
+        directorio_actual = os.getcwd()
+
+        #df_filtrado = pd.read_excel(directorio_actual  + self.nombre_archivo)
+        print(df_filtrado["VOLUMEN"])
         #df = df[df["latitudes"] != -33.464161]
         latitudes = df_filtrado["LATITUD"]
         longitudes = df_filtrado["LONGITUD"]
@@ -105,6 +109,19 @@ class Entregas:
 
             for _ in range(max_iters):
                 distances = np.linalg.norm(self.array_tridimensional[:, np.newaxis, :2] - centroids[:, :2], axis=2)
+                ##print(distances)
+                
+                # Condición para comparar las distancias con el umbral
+                #condicion = distances > 0
+                
+                # Reemplaza los valores que cumplen la condición con el valor que elijas (por ejemplo, 0)
+                #valor_elegido = 10000000000.0  # Puedes cambiar este valor según tus necesidades
+                #distances[condicion] = valor_elegido
+                
+                
+                
+                
+                
                 suma = sum(sum(distances))
 
                 labels = np.argmin(distances, axis=1)
@@ -112,11 +129,15 @@ class Entregas:
                 n_clusters = [len(self.array_tridimensional[labels == k][:, 2]) for k in range(K)]
                 #factibilidad = self.condicion(cluster_sums) and self.verificar_elemento_mayor(n_clusters, 6)
                 #factibilidad = condicion(camiones, "sinotrack", cluster_sums) and condicion(camiones, "jak", cluster_sums) and condicion(camiones, "hyundai", cluster_sums) and condicion(camiones, "externo_1", cluster_sums) and np.all(cluster_sums <= constraint_value)
-                #factibilidad = condicion(self.camiones, "Sinotrack", cluster_sums, n_clusters) and condicion(self.camiones, "JAK", cluster_sums, n_clusters) and condicion(self.camiones, "Hyundai", cluster_sums, n_clusters) and condicion(self.camiones, "Externo_1", cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
-                factibilidad = condicion_compuesta(self.camiones, cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
-                if factibilidad:
+                #factibilidad1 = condicion(self.camiones, "Sinotrack", cluster_sums, n_clusters) and condicion(self.camiones, "JAK", cluster_sums, n_clusters)  and condicion(self.camiones, "Externo_1", cluster_sums, n_clusters) 
+                #print(condicion(self.camiones, "Sinotrack", cluster_sums, n_clusters), condicion(self.camiones, "JAK", cluster_sums, n_clusters),""" condicion(self.camiones, "Hyundai", cluster_sums, n_clusters)""", condicion(self.camiones, "Externo_1", cluster_sums, n_clusters), np.all(cluster_sums <= constraint_value))
+                #and condicion(self.camiones, "Hyundai", cluster_sums, n_clusters)
+                factibilidad2 = condicion_compuesta(self.camiones, cluster_sums, n_clusters) and np.all(cluster_sums <= constraint_value)
+                #print(factibilidad2)
+                if factibilidad2:#factibilidad:
                     best_centroids = centroids
                     best_labels = labels
+                    print(self.camiones, cluster_sums, n_clusters)
 
             if best_centroids is not None:
                 break
@@ -126,6 +147,7 @@ class Entregas:
             return None, None
 
         return best_centroids, best_labels
+
 
     #def condicion(self, cluster_sums):
       #  return all(cluster_sums <= 26)
@@ -160,9 +182,9 @@ class Entregas:
 
     def ejecutar_modelo(self):
         K = self.sumar_vueltas()
-        K = 10
+        K = 15
         
-        for i in range(3, K):
+        for i in range(2, K):
             centroids, labels = self.kmeans_with_constraint(i)
 
             if centroids is not None:
@@ -230,7 +252,7 @@ class Entregas:
                         worksheet.write_row(row_num + 1, 0, row_data)
             
                     # Abre el archivo Excel "coordenadas.xlsx"
-                    wb = openpyxl.load_workbook(directorio_actual + f'/pedidos/coordenadas.xlsx')
+                    wb = openpyxl.load_workbook(directorio_actual + f'\\pedidos\\coordenadas.xlsx')
                     sheet = wb.active
             
                     # Crea una nueva hoja en "coordenadas.xlsx" para los registros específicos del cluster
@@ -255,3 +277,9 @@ class Entregas:
             
                 workbook.close()
 
+if __name__ == "__main__":
+    entregas = Entregas("/geo_test.xlsx")
+    entregas.cargar_datos("hola")
+    #entregas.crear_camion("juanito", 10, 6, 2, 7)
+    entregas.ejecutar_modelo()
+    #entregas.insumos_modelo()

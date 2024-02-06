@@ -10,7 +10,7 @@ class MainApp(QApplication):
     def __init__(self):
         super(QApplication, self).__init__(["AppRuteo"])
         # aplicar tema de libreria qt_material
-        apply_stylesheet(self, theme='dark_blue.xml', css_file='custom.css')
+        #apply_stylesheet(self, theme='dark_blue.xml', css_file='custom.css')
         self.icono = QIcon("logo\\WSC-LOGO2.ico")
 
         self.data_window = VentanaDatos(self.icono)
@@ -19,6 +19,7 @@ class MainApp(QApplication):
     
     def __on_edicion_terminada(self, df):
         print("señal recibida")
+        df.to_excel('geo_test.xlsx', index=False)
         self.ventana_principal = VentanaPrincipal(df, self.icono)
         self.ventana_principal.show()
         #self.data_window.close()

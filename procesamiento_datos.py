@@ -18,7 +18,7 @@ def procesar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha = (date.today() + timedelta(days=-14)).strftime('%d-%m-%Y')
+    fecha = (date.today() + timedelta(days=1)).strftime('%d-%m-%Y')
     print("fecha a filtrar:", fecha)
 
     # existe FECHA_SOLICITUD_DESPACHO y FECHA_PROG_DESPACHO
@@ -47,8 +47,8 @@ def procesar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             volumen_unidad_teorica = volumen_total/bultos
             print(volumen_unidad_teorica)
             peso_unidad_teorica = peso_total/bultos
-            
-            for bulto in range(bultos):
+            print("bultos", bultos)
+            for bulto in range(1, bultos+1):
                 
                 if bulto*volumen_unidad_teorica > capacidad_maxima_por_camion:
                     

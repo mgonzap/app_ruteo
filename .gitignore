@@ -5,3 +5,4 @@ pedidos/
 rutas/
 logo/
 base_datos.py
+__pycache__/

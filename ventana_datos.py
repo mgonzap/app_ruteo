@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QDialog, QTableView, QMenu, QHeaderView
-from PyQt6.QtCore import QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, QSize, QAbstractItemModel
+from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QDialog, QTableView, QMenu
+from PyQt6.QtCore import QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, QSize, QThread
 from PyQt6.QtGui import QAction, QGuiApplication
 import pandas as pd
 from urllib.parse import quote
@@ -11,16 +11,19 @@ from procesamiento_datos import *
 # se pide ayuda a usuario para corregir
 
 class VentanaDatos(QMainWindow):
-    edicion_terminada = pyqtSignal(pd.DataFrame)
+    edicion_terminada = pyqtSignal(pd.DataFrame, pd.DataFrame)
     def __init__(self, icono):
         super(QMainWindow, self).__init__()
         self.icono = icono
         
-        # TODO: ejecutar procesar_data de forma asincrona
-        # pues el procesamiento de datos espera a que se cierre el dialogo para iniciar
-        # self.generar_dialogo("Por favor espere, procesando los datos...")
-        self.recibir_datos(procesar_dataframe(procesar_query())[0])
+        self.worker_thread = ProcessingThread()
+        self.worker_thread.finished.connect(self.__on_datos_received__)
+        self.worker_thread.start()
+        self.generar_dialogo("Por favor espere, procesando los datos...")
         
+    def __on_datos_received__(self, df, df_separados):
+        self.df_separados = df_separados
+        self.recibir_datos(df)
         self.setWindowIcon(self.icono)
         self.setWindowTitle("Procesamiento de Datos")
 
@@ -41,7 +44,6 @@ class VentanaDatos(QMainWindow):
         self.vista_tabla.verticalHeader().hide()
         self.layout.addWidget(self.vista_tabla)
         
-        # TODO: ventana queda corta horizontalmente
         geometria_tabla = self.vista_tabla.frameGeometry()
         # Estilo modo oscuro de MainApp hace que resize quede pequeño horizontalmente
         # por eso obtenemos el tamaño horizontal de la pantalla y lo aplicamos
@@ -53,27 +55,29 @@ class VentanaDatos(QMainWindow):
         self.finalizar_button = QPushButton("Finalizar edición")
         self.finalizar_button.clicked.connect(self.finalizar_edicion)
         self.layout.addWidget(self.finalizar_button)
+        self.show()
+        self.dlg.close()
     
     def finalizar_edicion(self):
         copia_df = self.df.copy()
-        self.edicion_terminada.emit(copia_df)
+        self.edicion_terminada.emit(copia_df, self.df_separados)
         # TODO: geo está escribiendo dos veces en el archivo, la primera al georreferenciar coordenadas
         # y ahora que recibe el df editado. Ver que se haga una sola vez.
         georef.actualizar_coordenadas(copia_df)
         self.close()
     
     def generar_dialogo(self, texto):
-        dlg = QDialog()
-        dlg.setWindowIcon(self.icono)
-        dlg.setWindowTitle("Procesando Datos")
+        self.dlg = QDialog()
+        self.dlg.setWindowIcon(self.icono)
+        self.dlg.setWindowTitle("Procesando Datos")
         
         layout = QVBoxLayout()
         mensaje = QLabel(texto)
         
         layout.addWidget(mensaje)
         
-        dlg.setLayout(layout)
-        dlg.exec()  
+        self.dlg.setLayout(layout)
+        self.dlg.exec()  
     
     def recibir_datos(self, df):
         self.df = df
@@ -206,12 +210,17 @@ class ModeloProxyDataframe(QSortFilterProxyModel):
     # se muestran solo filas que retornen True al aplicarse el filtro
     def filterAcceptsRow(self, source_row, source_parent):
         # indices fueron obtenidos con self.df.columns.get_loc("LATITUD"), longitud es el indice siguiente
-        index_latitud = self.sourceModel().index(source_row, 27, source_parent)
-        index_longitud = self.sourceModel().index(source_row, 28, source_parent)
-        #print("resultado index_latitud", float(self.sourceModel().data(index_latitud)) == 0.0)
-        #print("resultado index_longitud", float(self.sourceModel().data(index_longitud)) == 0.0)
-        # TODO: condicion == no funciona, castear a float lo arregla, pero mejor indagar que tipo devuelve data
-        return float(self.sourceModel().data(index_latitud)) == 0.0 or float(self.sourceModel().data(index_longitud)) == 0.0
+        idx_latitud = self.sourceModel().index(source_row, 28, source_parent)
+        idx_longitud = self.sourceModel().index(source_row, 29, source_parent)
+        
+        # .data() devuelve un str
+        lat = float(self.sourceModel().data(idx_latitud))
+        long = float(self.sourceModel().data(idx_longitud))
+        error_georef = (lat == 0.0 or long == 0.0)
+        # coords_stgo -> lat: aprox entre -33.45 y -33.35
+        #               long: aprox entre -70.65 y -70.55
+        fuera_de_stgo = (int(lat) != -33) or (int(long) != -70)
+        return error_georef or fuera_de_stgo
     
     # se muestran solo las columnas las cuales retornen True al aplicar el filtro
     def filterAcceptsColumn(self, source_column, source_parent):
@@ -222,11 +231,12 @@ class ModeloProxyDataframe(QSortFilterProxyModel):
         return nombre_columna in ["CLIENTE", "DIRECCION", "DATOS TRANSPORTE EXTERNO", "TELEF. CONTACTO", "N° CARPETA", "LATITUD", "LONGITUD"]
 
 
-# Ejemplo de uso
-if __name__ == "__main__":
-    app = QApplication([])
-
-    ventana_datos = VentanaDatos()
-    ventana_datos.show()
-
-    app.exec()
+class ProcessingThread(QThread):
+    finished = pyqtSignal(pd.DataFrame, pd.DataFrame)
+    def __init__(self):
+        super().__init__()
+    
+    def run(self):
+        df, df_separados = procesar_dataframe(procesar_query())
+        self.finished.emit(df, df_separados)
+        

@@ -15,12 +15,15 @@ class MainApp(QApplication):
 
         self.data_window = VentanaDatos(self.icono)
         self.data_window.edicion_terminada.connect(self.__on_edicion_terminada)
-        self.data_window.show()
+        #self.data_window.show()
     
-    def __on_edicion_terminada(self, df):
+    def __on_edicion_terminada(self, df, df_separados):
         print("señal recibida")
-        df.to_excel('geo_test.xlsx', index=False)
-        self.ventana_principal = VentanaPrincipal(df, self.icono)
+        try:
+            df.to_excel('test/geo_test.xlsx', index=False)
+        except PermissionError:
+            print("No se pudo escribir 'test/geo_test.xlsx', permiso denegado.")
+        self.ventana_principal = VentanaPrincipal(df, df_separados, self.icono)
         self.ventana_principal.show()
         #self.data_window.close()
         #print("ventana datos cerrada")
@@ -28,11 +31,5 @@ class MainApp(QApplication):
 
 if __name__ == "__main__":
     print("Ejecutando main_app")
-    ### corra el filtro de fecha, luego geo, luego crear entrega con geo.xlsx
-    # abrir df de datos de xlsx, filtrar por fecha, pasar a geo
-    # geo entrega df con coordenadas, hacer checkeo de las coords
-    # si faltan coordenadas, abrir ventana para realizar input de coordenadas
-    # checkear que sea coordenada valida (buscar)
     app = MainApp()
-    # tomorrow_date = (date.today() + timedelta(days=1)).strftime('%d-%m-%Y')
     sys.exit(app.exec())

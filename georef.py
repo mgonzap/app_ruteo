@@ -26,7 +26,7 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
     
     if test_prints:
         print("Este es el inicio del programa georef.")
-        print(df_filtrado["DIRECCION"])
+        #print(df_filtrado["DIRECCION"])
     
     bodega = "Camino a noviciado 1945, Bodega 19, Pudahuel, Región Metropolitana"
     # Crea una instancia de Nominatim
@@ -45,9 +45,9 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
     # estos strings vienen la mayoría en formato 'NOMBRE_EXTERNO | DIRECCION', sin embargo
     # existe una excepción que es TVP.
     
-    print(df_filtrado[["DIRECCION", "VOLUMEN"]])
+    #print(df_filtrado[["DIRECCION", "VOLUMEN"]])
     for direccion, datos_externo in zip(df_filtrado["DIRECCION"], df_filtrado["DATOS TRANSPORTE EXTERNO"]):
-        print(datos_externo)
+        #print(datos_externo)
         if datos_externo != "NO APLICA":
             # TODO: formatear bien para preguntar, split por |
             datos_externo = datos_externo.split('|')
@@ -55,17 +55,18 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
             try:
                 datos_externo = datos_externo[1]
                 #print("se pudo splitear")
-            except Exception as e:
-                print(e)
+            except IndexError:
                 datos_externo = datos_externo[0]
                 #print("no se pudo papito....")
             location = geocode(datos_externo, country_codes="CL")
             if location is None:
-                print("fallo geolocalizacion de sucursal transporte externo")
+                #print("fallo geolocalizacion de sucursal transporte externo")
+                pass
         else:
             location = geocode(direccion, country_codes="CL")
             if location is None:
-                print("fallo geolocalizacion de direccion")
+                #print("fallo geolocalizacion de direccion")
+                pass
         
         if location is not None:
             #print("se encontro")
@@ -97,19 +98,24 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
     # Por ejemplo, df = pd.DataFrame({'Latitud': latitudes, 'Longitud': longitudes})
     
     # Nombre del archivo Excel de salida
-    nombre_archivo = "geo_coordenadas.xlsx"
+    nombre_archivo = "test/geo_coordenadas.xlsx"
     
     # Guarda el DataFrame como un archivo Excel
-    df_filtrado.to_excel(nombre_archivo, index=False)
-    
-    if test_prints:    
-        print(f"El DataFrame se ha guardado en '{nombre_archivo}'")
+    try:
+        df_filtrado.to_excel(nombre_archivo, index=False)
+        if test_prints:    
+            print(f"El DataFrame se ha guardado en '{nombre_archivo}'")
 
-        print(df_filtrado[["DIRECCION", "LATITUD", "LONGITUD"]])
+            print(df_filtrado[["DIRECCION", "LATITUD", "LONGITUD"]])
+    except PermissionError:
+        print(f"No se pudo escribir '{nombre_archivo}', permiso denegado.")
     
     return df_filtrado
 
 
 def actualizar_coordenadas(df_actualizado) -> None:
-    nombre_archivo = "geo_coordenadas.xlsx"
-    df_actualizado.to_excel(nombre_archivo, index=False)
+    nombre_archivo = "test/geo_coordenadas.xlsx"
+    try:
+        df_actualizado.to_excel(nombre_archivo, index=False)
+    except PermissionError:
+        print(f"No se pudo escribir '{nombre_archivo}', permiso denegado.")

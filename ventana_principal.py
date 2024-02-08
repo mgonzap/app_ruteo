@@ -1,23 +1,24 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QListWidget, QListWidgetItem
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread
 from app_ruteo import *
 from ventana_datos import *
 from datetime import date, timedelta
 from crear_camion_ventana import *
-import webbrowser
+from copy import deepcopy
 
 class VentanaPrincipal(QMainWindow):
 
-    def __init__(self, df_filtrado, icono):
+    def __init__(self, df_filtrado, df_separado, icono):
         super().__init__()
 
         self.entregas = Entregas()
         # TODO: recibir fecha
-        self.entregas.cargar_datos(df_filtrado)    
+        self.entregas.cargar_datos(df_filtrado, df_separado)
         
         self.setWindowIcon(icono)
 
         self.camiones_seleccionados = list(self.entregas.camiones.keys())
+        self.dict_camiones = deepcopy(self.entregas.camiones)
 
         self.setWindowTitle("Modelo de Optimización de rutas WScargo")
         self.setGeometry(100, 100, 700, 600)
@@ -88,23 +89,30 @@ class VentanaPrincipal(QMainWindow):
             nuevo_item = QListWidgetItem(camion)
             nuevo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lista_camiones.addItem(nuevo_item)
-        
-        self.h_resultado_layout = QHBoxLayout()
-        
-        # TODO: Crear un widget que muestre el HTML de ruteo que se genera.
-        self.resultado_label = QLabel(self)
-        self.resultado_label.setText("RESULTADOS")
-        self.resultado_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.h_resultado_layout.addWidget(self.resultado_label)
-        
-        self.v_list_layout.addLayout(self.h_resultado_layout)
 
+        self.worker_thread = None
         self.calcular_button = QPushButton("Calcular Vueltas y Servicios", self)
         self.calcular_button.clicked.connect(self.ejecutar_modelo)
         self.v_list_layout.addWidget(self.calcular_button)
         
         self.layout.addLayout(self.v_list_layout, 65)
 
+    def ejecutar_modelo(self):
+        self.worker_thread = WorkerThread(self.entregas, self.camiones_seleccionados)
+        self.worker_thread.finished.connect(self.on_finished)
+        self.worker_thread.start()
+        self.calc_dlg = QDialog(self)
+        self.calc_dlg.setWindowTitle("Calculando Rutas")
+        
+        layout = QVBoxLayout()
+        mensaje = QLabel(
+            "Calculando rutas para las entregas..."
+            )
+        
+        layout.addWidget(mensaje)
+        
+        self.calc_dlg.setLayout(layout)
+        self.calc_dlg.exec()
 
     def abrir_ventana_creacion(self):
         camion_ventana = VentanaCreacionCamion(self, self.agregar_camion, self.entregas)
@@ -114,6 +122,7 @@ class VentanaPrincipal(QMainWindow):
         camion_seleccionado = self.combo_camiones.currentText()
         if camion_seleccionado not in self.camiones_seleccionados:
             self.camiones_seleccionados.append(camion_seleccionado)
+            self.entregas.camiones[camion_seleccionado] = self.dict_camiones[camion_seleccionado]
             nuevo_item = QListWidgetItem(camion_seleccionado)
             nuevo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lista_camiones.addItem(nuevo_item)
@@ -130,12 +139,12 @@ class VentanaPrincipal(QMainWindow):
         camion_a_eliminar = camion_a_eliminar.text()
         if camion_a_eliminar in self.entregas.camiones:
             # Aquí se elimina el camión de la 'db', no es lo ideal
-            # del self.entregas.camiones[camion_a_eliminar]
+            del self.entregas.camiones[camion_a_eliminar]
             self.actualizar_combo_camiones()
             self.quitar_camion_lista()
 
     def actualizar_combo_camiones(self):
-        camiones_disponibles = list(self.entregas.camiones.keys())
+        camiones_disponibles = list(self.dict_camiones.keys())
         self.combo_camiones.clear()
         self.combo_camiones.addItems(camiones_disponibles)
 
@@ -143,16 +152,6 @@ class VentanaPrincipal(QMainWindow):
         camion_a_quitar = self.lista_camiones.currentItem().text()
         self.camiones_seleccionados.remove(camion_a_quitar)
         self.lista_camiones.takeItem(self.lista_camiones.currentRow())
-
-    def ejecutar_modelo(self):
-        # TODO: despues de ejecutar modelo llamar a widget para mostrar HTML de rutas
-        self.resultado_label.setText(f"{self.camiones_seleccionados}")
-        print("Camiones seleccionados para ejecucion:", self.camiones_seleccionados)
-        # TODO: pasar a modelo lista de camiones a usar?
-        self.entregas.ejecutar_modelo()
-        file_path = ['mapas\mapa_3_Rutas.html', 'mapas\mapa_4_Rutas.html']
-        for fpath in file_path:
-            webbrowser.open('file://' + os.path.abspath(fpath))
     
     def generar_advertencia(self, texto):
         dlg = QDialog(self)
@@ -165,3 +164,20 @@ class VentanaPrincipal(QMainWindow):
         
         dlg.setLayout(layout)
         dlg.exec()
+        
+    def on_finished(self):
+        self.calc_dlg.close()
+
+
+class WorkerThread(QThread):
+    finished = pyqtSignal()
+    
+    def __init__(self, entregas, camiones):
+        super().__init__()
+        self.entregas: Entregas = entregas
+        self.camiones = camiones
+
+    def run(self):
+        print("Camiones seleccionados para ejecucion:", self.camiones)
+        self.entregas.ejecutar_modelo()
+        self.finished.emit()

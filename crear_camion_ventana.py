@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QDialog, QSpinBox
 from PyQt6 import QtGui
+from app_ruteo import Camion
 
 # TODO: que herede de QMainWindow para aplicar show() sin necesitar la funcion mostrar()
 class VentanaCreacionCamion:
@@ -7,7 +8,6 @@ class VentanaCreacionCamion:
         self.parent = parent
         
         self.ventana_creacion = QMainWindow(self.parent)
-        
         
         self.ventana_creacion.setWindowIcon(QtGui.QIcon("logo\\WSC-LOGO2.ico"))
         self.ventana_creacion.setWindowTitle("Crear Camión")
@@ -63,6 +63,8 @@ class VentanaCreacionCamion:
             val = objeto.crear_camion(nombre, capacidad, sub_capacidad, vueltas, max_entregas)
             if not val:
                 self.generar_advertencia("Ocurrió un error al crear el camión. \nRevise que ya no exista un camión con ese nombre o que los valores sean válidos.")
+                return
+            self.parent.dict_camiones[nombre] = Camion(capacidad, sub_capacidad, vueltas, max_entregas)
             self.ventana_creacion.close()
             self.parent.actualizar_combo_camiones()
             

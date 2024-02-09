@@ -18,7 +18,9 @@ class MainApp(QApplication):
         #self.data_window.show()
     
     def __on_edicion_terminada(self, df, df_separados):
-        print("señal recibida")
+        if df.empty and df_separados.empty:
+            # TODO: popup/ventana que explique que no hay datos 
+            sys.exit()
         try:
             df.to_excel('test/geo_test.xlsx', index=False)
         except PermissionError:

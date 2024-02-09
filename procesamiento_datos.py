@@ -19,7 +19,8 @@ def procesar_dataframe(df: pd.DataFrame):
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha_filtrado = (date.today() + timedelta(days=-8)).strftime('%d-%m-%Y')
+    fecha_filtrado = (date.today() + timedelta(days=0)).strftime('%d-%m-%Y')
+    print("fecha hoy:", date.today().strftime('%d-%m-%Y'))
     print("fecha a filtrar:", fecha_filtrado)
     
     try:

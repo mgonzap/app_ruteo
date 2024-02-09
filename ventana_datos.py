@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QDialog, QTableView, QMenu
-from PyQt6.QtCore import QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, QSize, QThread
+from PyQt6.QtCore import QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, QSize, QThread, QTimer
 from PyQt6.QtGui import QAction, QGuiApplication
 import pandas as pd
 from urllib.parse import quote
@@ -19,42 +19,48 @@ class VentanaDatos(QMainWindow):
         self.worker_thread = ProcessingThread()
         self.worker_thread.finished.connect(self.__on_datos_received__)
         self.worker_thread.start()
-        self.generar_dialogo("Por favor espere, procesando los datos...")
+        
+        self.init_timer = QTimer()
+        self.init_timer.setSingleShot(True)
+        self.init_timer.timeout.connect(self.generar_dialogo)
+        self.init_timer.start(100)
         
     def __on_datos_received__(self, df, df_separados):
         self.df_separados = df_separados
+
         self.recibir_datos(df)
         self.setWindowIcon(self.icono)
         self.setWindowTitle("Procesamiento de Datos")
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
+        
+        if not df.empty:
+            self.layout = QVBoxLayout(self.central_widget)
 
-        self.layout = QVBoxLayout(self.central_widget)
-
-        self.label_nombre = QLabel(
-            "Es necesario corregir las siguientes coordenadas. " +
-            "Haga click derecho en la dirección o en los datos de transporte externo para buscar coordenadas:"
-            )
-        self.layout.addWidget(self.label_nombre)
-        
-        self.vista_tabla = CustomTableView()
-        self.vista_tabla.setModel(self.modelo_proxy_tabla)
-        # Esconder columna de IDs
-        self.vista_tabla.verticalHeader().hide()
-        self.layout.addWidget(self.vista_tabla)
-        
-        geometria_tabla = self.vista_tabla.frameGeometry()
-        # Estilo modo oscuro de MainApp hace que resize quede pequeño horizontalmente
-        # por eso obtenemos el tamaño horizontal de la pantalla y lo aplicamos
-        screen = QGuiApplication.primaryScreen().availableSize()
-        self.resize(QSize(screen.width(), geometria_tabla.height()))
-        self.vista_tabla.ajustar_columnas()
-        
-        # Finalizar la edicion y pasar los datos al df 'de verdad'
-        self.finalizar_button = QPushButton("Finalizar edición")
-        self.finalizar_button.clicked.connect(self.finalizar_edicion)
-        self.layout.addWidget(self.finalizar_button)
+            self.label_nombre = QLabel(
+                "Es necesario corregir las siguientes coordenadas. " +
+                "Haga click derecho en la dirección o en los datos de transporte externo para buscar coordenadas:"
+                )
+            self.layout.addWidget(self.label_nombre)
+            
+            self.vista_tabla = CustomTableView()
+            self.vista_tabla.setModel(self.modelo_proxy_tabla)
+            # Esconder columna de IDs
+            self.vista_tabla.verticalHeader().hide()
+            self.layout.addWidget(self.vista_tabla)
+            
+            geometria_tabla = self.vista_tabla.frameGeometry()
+            # Estilo modo oscuro de MainApp hace que resize quede pequeño horizontalmente
+            # por eso obtenemos el tamaño horizontal de la pantalla y lo aplicamos
+            screen = QGuiApplication.primaryScreen().availableSize()
+            self.resize(QSize(screen.width(), geometria_tabla.height()))
+            self.vista_tabla.ajustar_columnas()
+            
+            # Finalizar la edicion y pasar los datos al df 'de verdad'
+            self.finalizar_button = QPushButton("Finalizar edición")
+            self.finalizar_button.clicked.connect(self.finalizar_edicion)
+            self.layout.addWidget(self.finalizar_button)
         self.show()
         self.dlg.close()
     
@@ -66,11 +72,12 @@ class VentanaDatos(QMainWindow):
         georef.actualizar_coordenadas(copia_df)
         self.close()
     
-    def generar_dialogo(self, texto):
-        self.dlg = QDialog()
+    def generar_dialogo(self):
+        self.dlg = QDialog(self)
         self.dlg.setWindowIcon(self.icono)
         self.dlg.setWindowTitle("Procesando Datos")
         
+        texto = "Por favor espere, procesando los datos..."
         layout = QVBoxLayout()
         mensaje = QLabel(texto)
         
@@ -90,7 +97,7 @@ class VentanaDatos(QMainWindow):
     # reemplazamos la funcion show para que revise si hay datos que necesiten corrección
     # si no, simplemente se considera la edición finalizada.
     def show(self):
-        if self.vista_tabla.model() is None or self.vista_tabla.model().rowCount() == 0:
+        if self.df.empty or self.vista_tabla.model() is None or self.vista_tabla.model().rowCount() == 0:
             self.finalizar_edicion()
         else:
             super().show()

@@ -3,11 +3,10 @@ import pandas as pd
 from datetime import date, timedelta
 from base_datos import *
 import georef
-import timeit
 
 # Para procesar datos de query / xlsx
 # Funcion temporal para cargar excel, idealmente se manejaria por query
-def procesar_dataframe(df: pd.DataFrame):
+def procesar_dataframe(df: pd.DataFrame, fecha: str):
     """Procesa datos desde query o archivo xlsx, realizando un filtro por fecha
     para obtener las filas donde 'FECHA SOLICITUD DESPACHO' corresponda al día de mañana.
     Luego se entregan los datos como DataFrame a georef, quien añade columnas de latitud y longitud.
@@ -19,7 +18,7 @@ def procesar_dataframe(df: pd.DataFrame):
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha_filtrado = (date.today() + timedelta(days=0)).strftime('%d-%m-%Y')
+    fecha_filtrado = fecha
     print("fecha hoy:", date.today().strftime('%d-%m-%Y'))
     print("fecha a filtrar:", fecha_filtrado)
     
@@ -53,7 +52,8 @@ def procesar_dataframe(df: pd.DataFrame):
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
     df = georef.pasar_a_coordenadas(df, test_prints=False)
     
-    df, entregas_separadas = separar_entregas(df, capacidad_max_camion=18)
+    # TODO: definir capacidad max de camion
+    df, entregas_separadas = separar_entregas(df, capacidad_max_camion=26)
     
     #print(entregas_de_un_camion[['DIRECCION', 'N° BULTOS', 'VOLUMEN', 'PESO']])
     return df, entregas_separadas

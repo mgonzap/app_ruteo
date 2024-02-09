@@ -55,11 +55,11 @@ class Entregas:
     def __init__(self):
         
         # self.nombre_archivo = nombre_archivo
-        self.camiones = {"Sinotruck": Camion(28, 22, 2, 10),
-                    "JAK": Camion(18, 8, 2, 10),
-                    "Hyundai": Camion(8, 0, 1, 10),
-                    "Externo_1": Camion(22, 18, 2, 10),
-                    "Externo_2": Camion(22, 18, 4, 10)
+        self.camiones = {
+            "Sinotruk": Camion(28, 22, 2, 10),
+            "JAC": Camion(18, 8, 2, 10),
+            "Hyundai": Camion(8, 0, 1, 10),
+            "Externo_1": Camion(22, 18, 2, 10)
         }
         
         self.df = None
@@ -76,6 +76,7 @@ class Entregas:
         self.df = df_filtrado
         self.df_separados = df_separados
         print(df_filtrado["VOLUMEN"])
+        self.fecha_filtrado = df_filtrado['FECHA SOLICITUD DESPACHO'].iloc[0]
         #df = df[df["latitudes"] != -33.464161]
         latitudes = df_filtrado["LATITUD"]
         longitudes = df_filtrado["LONGITUD"]
@@ -94,7 +95,7 @@ class Entregas:
             df_malos = df_filtrado[df_filtrado['SERVICIO'] == '']
             # en este punto carpeta test deberia existir
             df_malos.to_excel('test/malos.xlsx', index=False)
-            print("n_servicio vacios", df_filtrado[df_filtrado['SERVICIO'] == ''])
+            #print("n_servicio vacios", df_filtrado[df_filtrado['SERVICIO'] == ''])
             n_servicio = np.array([n_servicio.split(',')[0] if len(n_servicio)> 0 else -1
                                    for n_servicio in df_filtrado["SERVICIO"]]).astype(np.float64)
 
@@ -183,11 +184,11 @@ class Entregas:
                 popup=f'Punto {i}, Cluster {label}, Volumen {volumen}, Numero servicio {n_serv}'
             ).add_to(mapa_santiago)
         
-        if not os.path.exists('mapas'):
-            os.makedirs('mapas')
-        map_path = f"mapas/mapa_{j}_Rutas.html"
+        if not os.path.exists(f'mapas/{self.fecha_filtrado}'):
+            os.makedirs(f'mapas/{self.fecha_filtrado}')
+        map_path = f"mapas/{self.fecha_filtrado}/mapa_{j}_Rutas.html"
         mapa_santiago.save(map_path)
-        print("Mapa Creado")
+        #print("Mapa Creado")
         # Abrimos el mapa para mostrar
         webbrowser.open('file://' + os.path.abspath(map_path))
 
@@ -223,9 +224,9 @@ class Entregas:
             # Modificar excel..?
             if centroids is not None:
                 directorio_actual = os.getcwd()
-                if not os.path.exists('rutas'):
-                        os.makedirs('rutas')
-                workbook = xlsxwriter.Workbook(directorio_actual + f'/rutas/{i}_Ruta_info.xlsx')
+                if not os.path.exists(f'rutas/{self.fecha_filtrado}'):
+                        os.makedirs(f'rutas/{self.fecha_filtrado}')
+                workbook = xlsxwriter.Workbook(directorio_actual + f'/rutas/{self.fecha_filtrado}/{i}_Ruta_info.xlsx')
             
                 for k in range(i):
                     cluster_points = self.array_tridimensional[labels == k]
@@ -296,6 +297,10 @@ class Entregas:
                             # no vemos por el item individual, si no por la suma de su cluster
                             if camion.sub_capacidad <= cluster_sum <= camion.capacidad:
                                 camion_str = nombre.upper()
+                        if camion_str == "S/I":
+                            #print(cluster_sum)
+                            pass
+                        
                         direccion = fila_df['DIRECCION'].values[0]
                         comuna = fila_df['COMUNA'].values[0]
                         empresa_ext = fila_df['DATOS TRANSPORTE EXTERNO'].values[0]
@@ -352,14 +357,11 @@ class Entregas:
                     lista_filas.append(fila)
                     ruta += 1
                     
-                fecha_filtrado = fila_df['FECHA SOLICITUD DESPACHO']
-                fecha_filtrado = fecha_filtrado if isinstance(fecha_filtrado, str) else fecha_filtrado.values[0]
-                    
                 df_excel = pd.DataFrame(lista_filas, columns=cols)
                 try:
-                    if not os.path.exists('resumen_despachos'):
-                        os.makedirs('resumen_despachos')
-                    df_excel.to_excel(f'resumen_despachos/resumen-{fecha_filtrado}.xlsx', index=False)
+                    if not os.path.exists(f'resumen_despachos/{self.fecha_filtrado}'):
+                        os.makedirs(f'resumen_despachos/{self.fecha_filtrado}')
+                    df_excel.to_excel(f'resumen_despachos/{self.fecha_filtrado}/resumen-{i}_rutas.xlsx', index=False)
                 except PermissionError:
                     print("No se pudo generar el excel de resumen despacho.")
                 

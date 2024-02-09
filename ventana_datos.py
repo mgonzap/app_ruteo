@@ -12,11 +12,12 @@ from procesamiento_datos import *
 
 class VentanaDatos(QMainWindow):
     edicion_terminada = pyqtSignal(pd.DataFrame, pd.DataFrame)
-    def __init__(self, icono):
+    def __init__(self, fecha, icono):
         super(QMainWindow, self).__init__()
         self.icono = icono
-        
-        self.worker_thread = ProcessingThread()
+        self.fecha = fecha
+        #print("fecha recibida en ventana datos:", fecha)
+        self.worker_thread = ProcessingThread(fecha)
         self.worker_thread.finished.connect(self.__on_datos_received__)
         self.worker_thread.start()
         
@@ -240,10 +241,11 @@ class ModeloProxyDataframe(QSortFilterProxyModel):
 
 class ProcessingThread(QThread):
     finished = pyqtSignal(pd.DataFrame, pd.DataFrame)
-    def __init__(self):
+    def __init__(self, fecha):
         super().__init__()
+        self.fecha = fecha
     
     def run(self):
-        df, df_separados = procesar_dataframe(procesar_query())
+        df, df_separados = procesar_dataframe(procesar_query(), self.fecha)
         self.finished.emit(df, df_separados)
         

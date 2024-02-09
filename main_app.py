@@ -1,4 +1,5 @@
 from ventana_principal import *
+from ventana_fecha import *
 from PyQt6.QtGui import QIcon
 from qt_material import apply_stylesheet
 import sys
@@ -12,10 +13,15 @@ class MainApp(QApplication):
         # aplicar tema de libreria qt_material
         #apply_stylesheet(self, theme='dark_blue.xml', css_file='custom.css')
         self.icono = QIcon("logo\\WSC-LOGO2.ico")
-
-        self.data_window = VentanaDatos(self.icono)
+        
+        self.ventana_fecha = VentanaFecha(self.icono)
+        self.ventana_fecha.fecha_seleccionada.connect(self.__on_fecha_elegida)
+        self.ventana_fecha.show()
+        
+    def __on_fecha_elegida(self, fecha):
+        self.data_window = VentanaDatos(fecha, self.icono)
         self.data_window.edicion_terminada.connect(self.__on_edicion_terminada)
-        #self.data_window.show()
+        self.ventana_fecha.hide()
     
     def __on_edicion_terminada(self, df, df_separados):
         if df.empty and df_separados.empty:
@@ -27,6 +33,7 @@ class MainApp(QApplication):
             print("No se pudo escribir 'test/geo_test.xlsx', permiso denegado.")
         self.ventana_principal = VentanaPrincipal(df, df_separados, self.icono)
         self.ventana_principal.show()
+        self.ventana_fecha.close()
         #self.data_window.close()
         #print("ventana datos cerrada")
         #print("ventana principal abierta")

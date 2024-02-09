@@ -7,7 +7,7 @@ import timeit
 
 # Para procesar datos de query / xlsx
 # Funcion temporal para cargar excel, idealmente se manejaria por query
-def procesar_dataframe(df: pd.DataFrame):
+def procesar_dataframe(df: pd.DataFrame, fecha: str):
     """Procesa datos desde query o archivo xlsx, realizando un filtro por fecha
     para obtener las filas donde 'FECHA SOLICITUD DESPACHO' corresponda al día de mañana.
     Luego se entregan los datos como DataFrame a georef, quien añade columnas de latitud y longitud.
@@ -19,7 +19,7 @@ def procesar_dataframe(df: pd.DataFrame):
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha_filtrado = (date.today() + timedelta(days=0)).strftime('%d-%m-%Y')
+    fecha_filtrado = fecha
     print("fecha hoy:", date.today().strftime('%d-%m-%Y'))
     print("fecha a filtrar:", fecha_filtrado)
     

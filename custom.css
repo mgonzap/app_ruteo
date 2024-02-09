@@ -1,0 +1,16 @@
+/* Archivo CSS para qt_material */
+QComboBox {{
+    color: {QTMATERIAL_SECONDARYTEXTCOLOR}
+}}
+QLineEdit {{
+    color: {QTMATERIAL_SECONDARYTEXTCOLOR}
+}}
+QSpinBox {{
+    color: {QTMATERIAL_SECONDARYTEXTCOLOR}
+}}
+QDateTimeEdit {{
+    color: {QTMATERIAL_SECONDARYTEXTCOLOR}
+}}
+QHeaderView::section {{
+    padding: 0 5px
+}}

@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import date, timedelta
 from base_datos import *
 import georef
-import timeit
 
 # Para procesar datos de query / xlsx
 # Funcion temporal para cargar excel, idealmente se manejaria por query
@@ -53,7 +52,8 @@ def procesar_dataframe(df: pd.DataFrame, fecha: str):
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
     df = georef.pasar_a_coordenadas(df, test_prints=False)
     
-    df, entregas_separadas = separar_entregas(df, capacidad_max_camion=18)
+    # TODO: definir capacidad max de camion
+    df, entregas_separadas = separar_entregas(df, capacidad_max_camion=26)
     
     #print(entregas_de_un_camion[['DIRECCION', 'N° BULTOS', 'VOLUMEN', 'PESO']])
     return df, entregas_separadas

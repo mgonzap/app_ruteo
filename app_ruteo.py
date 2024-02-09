@@ -56,10 +56,14 @@ class Entregas:
         
         # self.nombre_archivo = nombre_archivo
         self.camiones = {
-            "Sinotruk": Camion(28, 22, 2, 10),
-            "JAC": Camion(18, 8, 2, 10),
-            "Hyundai": Camion(8, 0, 1, 10),
-            "Externo_1": Camion(22, 18, 2, 10)
+            # 1 vuelta 5 ptos
+            "Sinotruk": Camion(26, 17, 1, 5),
+            # 1 vuelta 8 ptos
+            "JAC": Camion(16, 6, 1, 8),
+            # 1 vuelta 6 ptos
+            "Hyundai": Camion(6, 0, 1, 6),
+            "Externo_1": Camion(17, 16, 1, 7),
+            "Externo_2": Camion(17, 16, 1, 7)
         }
         
         self.df = None

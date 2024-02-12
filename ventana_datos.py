@@ -1,23 +1,32 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QDialog, QTableView, QMenu
-from PyQt6.QtCore import QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, QSize, QThread, QTimer
-from PyQt6.QtGui import QAction, QGuiApplication
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, 
+    QDialog, QTableView, QMenu, QMessageBox
+)
+from PyQt6.QtCore import (
+    QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, 
+    QSize, QThread, QTimer
+)
+from PyQt6.QtGui import QAction, QCloseEvent, QGuiApplication
 import pandas as pd
+import georef
+import sys
 from urllib.parse import quote
-from ventana_navegador import *
-from procesamiento_datos import *
+from ventana_navegador import VentanaNavegador
+from procesamiento_datos import procesar_dataframe, procesar_query
 
 # Clase dedicada al procesamiento de datos (temporalmente, desde el excel)
 # En caso de que los datos necesiten procesamiento extra (ej, georef no logra obtener coordenadas)
 # se pide ayuda a usuario para corregir
 
 class VentanaDatos(QMainWindow):
-    edicion_terminada = pyqtSignal(pd.DataFrame, pd.DataFrame)
+    edicion_terminada = pyqtSignal(pd.DataFrame)
     def __init__(self, fecha, icono):
         super(QMainWindow, self).__init__()
         self.icono = icono
         self.fecha = fecha
         #print("fecha recibida en ventana datos:", fecha)
-        self.worker_thread = ProcessingThread(fecha)
+        self.worker_thread = DataThread(fecha)
+        self.worker_thread.setTerminationEnabled(True)
         self.worker_thread.finished.connect(self.__on_datos_received__)
         self.worker_thread.start()
         
@@ -26,9 +35,7 @@ class VentanaDatos(QMainWindow):
         self.init_timer.timeout.connect(self.generar_dialogo)
         self.init_timer.start(100)
         
-    def __on_datos_received__(self, df, df_separados):
-        self.df_separados = df_separados
-
+    def __on_datos_received__(self, df):
         self.recibir_datos(df)
         self.setWindowIcon(self.icono)
         self.setWindowTitle("Procesamiento de Datos")
@@ -62,30 +69,22 @@ class VentanaDatos(QMainWindow):
             self.finalizar_button = QPushButton("Finalizar edición")
             self.finalizar_button.clicked.connect(self.finalizar_edicion)
             self.layout.addWidget(self.finalizar_button)
+        self.move(0, self.y())
         self.show()
-        self.dlg.close()
+        self.dlg.close_directly()
+    
+    def generar_dialogo(self):
+        self.dlg = ConfirmDialog(self)
+        self.dlg.salida_confirmada.connect(sys.exit)
+        self.dlg.exec()
     
     def finalizar_edicion(self):
         copia_df = self.df.copy()
-        self.edicion_terminada.emit(copia_df, self.df_separados)
+        self.edicion_terminada.emit(copia_df)
         # TODO: geo está escribiendo dos veces en el archivo, la primera al georreferenciar coordenadas
         # y ahora que recibe el df editado. Ver que se haga una sola vez.
         georef.actualizar_coordenadas(copia_df)
         self.close()
-    
-    def generar_dialogo(self):
-        self.dlg = QDialog(self)
-        self.dlg.setWindowIcon(self.icono)
-        self.dlg.setWindowTitle("Procesando Datos")
-        
-        texto = "Por favor espere, procesando los datos..."
-        layout = QVBoxLayout()
-        mensaje = QLabel(texto)
-        
-        layout.addWidget(mensaje)
-        
-        self.dlg.setLayout(layout)
-        self.dlg.exec()  
     
     def recibir_datos(self, df):
         self.df = df
@@ -115,8 +114,8 @@ class CustomTableView(QTableView):
         self.customContextMenuRequested.connect(self.mostrar_menu_contextual)
     
     def ajustar_columnas(self):
-        # Para direccion expandimos totalmente
-        self.resizeColumnToContents(1)
+        # Para direccion
+        self.horizontalHeader().resizeSection(1, int(self.viewport().size().width() * 1.0))
         # Para datos transporte externo no del todo
         self.horizontalHeader().resizeSection(4, int(self.viewport().size().width() * 0.35))
 
@@ -239,13 +238,42 @@ class ModeloProxyDataframe(QSortFilterProxyModel):
         return nombre_columna in ["CLIENTE", "DIRECCION", "DATOS TRANSPORTE EXTERNO", "TELEF. CONTACTO", "N° CARPETA", "LATITUD", "LONGITUD"]
 
 
-class ProcessingThread(QThread):
-    finished = pyqtSignal(pd.DataFrame, pd.DataFrame)
+class DataThread(QThread):
+    finished = pyqtSignal(pd.DataFrame)
     def __init__(self, fecha):
         super().__init__()
         self.fecha = fecha
     
     def run(self):
-        df, df_separados = procesar_dataframe(procesar_query(), self.fecha)
-        self.finished.emit(df, df_separados)
+        df = procesar_dataframe(procesar_query(self.fecha), self.fecha)
+        self.finished.emit(df)
+
+
+class ConfirmDialog(QDialog):
+    salida_confirmada = pyqtSignal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        if parent != None:
+            self.setWindowIcon(parent.icono)
+        self.setWindowTitle("Procesando Datos")
+        texto = "Por favor espere, obteniendo y procesando los datos..."
+        layout = QVBoxLayout()
+        mensaje = QLabel(texto)
         
+        layout.addWidget(mensaje)       
+        self.setLayout(layout)
+        
+    def closeEvent(self, event):
+        confirmacion = QMessageBox.question(self, "Confirmar cierre", 
+                                             "¿Estás seguro de que quieres cerrar la aplicación?",
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirmacion == QMessageBox.StandardButton.Yes:
+            self.salida_confirmada.emit()
+            event.accept()
+        else:
+            event.ignore()
+    
+    def close_directly(self):
+        self.closeEvent = lambda event: event.accept()
+        self.close()

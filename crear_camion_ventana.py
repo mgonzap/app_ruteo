@@ -27,15 +27,15 @@ class VentanaCreacionCamion:
         self.entry_capacidad = QSpinBox()
         self.layout.addWidget(self.entry_capacidad)
 
-        label_sub_capacidad = QLabel("Sub Capacidad:")
-        self.layout.addWidget(label_sub_capacidad)
-        self.entry_sub_capacidad = QSpinBox()
-        self.layout.addWidget(self.entry_sub_capacidad)
+        #label_sub_capacidad = QLabel("Sub Capacidad:")
+        #self.layout.addWidget(label_sub_capacidad)
+        #self.entry_sub_capacidad = QSpinBox()
+        #self.layout.addWidget(self.entry_sub_capacidad)
         
-        label_peso = QLabel("Peso Máximo (Kg):")
-        self.layout.addWidget(label_peso)
-        self.entry_peso = QSpinBox()
-        self.layout.addWidget(self.entry_peso)
+        #label_peso = QLabel("Peso Máximo (Kg):")
+        #self.layout.addWidget(label_peso)
+        #self.entry_peso = QSpinBox()
+        #self.layout.addWidget(self.entry_peso)
 
         label_vueltas = QLabel("Vueltas:")
         self.layout.addWidget(label_vueltas)
@@ -54,17 +54,16 @@ class VentanaCreacionCamion:
             try:
                 nombre = self.entry_nombre.text()
                 capacidad = self.entry_capacidad.value()
-                sub_capacidad = self.entry_sub_capacidad.value()
                 vueltas = self.entry_vueltas.value()
                 max_entregas = self.entry_max_entregas.value()
             except:
                 self.generar_advertencia("Recuerde rellenar todos los campos")
                 return
-            val = objeto.crear_camion(nombre, capacidad, sub_capacidad, vueltas, max_entregas)
+            val = objeto.crear_camion(nombre, capacidad, 0, vueltas, max_entregas)
             if not val:
                 self.generar_advertencia("Ocurrió un error al crear el camión. \nRevise que ya no exista un camión con ese nombre o que los valores sean válidos.")
                 return
-            self.parent.dict_camiones[nombre] = Camion(capacidad, sub_capacidad, vueltas, max_entregas)
+            self.parent.dict_camiones[nombre] = Camion(capacidad, 0, vueltas, max_entregas)
             self.ventana_creacion.close()
             self.parent.actualizar_combo_camiones()
             

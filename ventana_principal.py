@@ -1,27 +1,32 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QListWidget, QListWidgetItem
-from PyQt6.QtCore import Qt, QThread
-from app_ruteo import *
-from ventana_datos import *
-from datetime import date, timedelta
-from crear_camion_ventana import *
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QPushButton, QComboBox, QListWidget, QListWidgetItem, QDialog,
+    QMessageBox
+)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QPixmap
+from app_ruteo import Entregas
+from crear_camion_ventana import VentanaCreacionCamion
 from copy import deepcopy
 
 class VentanaPrincipal(QMainWindow):
 
-    def __init__(self, df_filtrado, df_separado, icono):
+    def __init__(self, df_filtrado, fecha, icono):
         super().__init__()
 
+        self.worker_thread = None
         self.entregas = Entregas()
-        # TODO: recibir fecha
-        self.entregas.cargar_datos(df_filtrado, df_separado)
+        # cargamos el DataFrame
+        self.entregas.df = df_filtrado
         
         self.setWindowIcon(icono)
+        self.icono = icono
 
         self.camiones_seleccionados = list(self.entregas.camiones.keys())
         self.dict_camiones = deepcopy(self.entregas.camiones)
 
         self.setWindowTitle("Modelo de Optimización de rutas WScargo")
-        self.setGeometry(100, 100, 700, 600)
+        self.setGeometry(100, 100, 700, 400)
 
         self.central_widget = QWidget(self)
         self.central_widget.setContentsMargins(10, 5, 10, 5)
@@ -36,7 +41,7 @@ class VentanaPrincipal(QMainWindow):
         
         ### Logo
         self.logo_label = QLabel()
-        self.pixmap_test = QtGui.QPixmap("logo\\WSC-LOGO.png")
+        self.pixmap_test = QPixmap("logo\\WSC-LOGO.png")
         self.logo_label.setPixmap(self.pixmap_test)
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v_combo_layout.addWidget(self.logo_label)
@@ -46,7 +51,7 @@ class VentanaPrincipal(QMainWindow):
         
         ### Fecha
         # TODO: recibir fecha desde VentanaDatos o algun otra alternativa
-        self.fecha_line_edit = QLabel("Se calcularán rutas para mañana: " + (date.today() + timedelta(days=1)).strftime('%d-%m-%Y'), self)
+        self.fecha_line_edit = QLabel(f"Se calcularán rutas para: {fecha}", self)
         self.fecha_line_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v_combo_layout.addWidget(self.fecha_line_edit)
         
@@ -98,21 +103,21 @@ class VentanaPrincipal(QMainWindow):
         self.layout.addLayout(self.v_list_layout, 65)
 
     def ejecutar_modelo(self):
-        self.worker_thread = WorkerThread(self.entregas, self.camiones_seleccionados)
-        self.worker_thread.finished.connect(self.on_finished)
+        if self.worker_thread != None and self.worker_thread.isRunning():
+            self.generar_advertencia("Ya se están calculando rutas. Se debe esperar a que termine el proceso.")
+            return
+        
+        self.worker_thread = RoutesThread(self.entregas, self.camiones_seleccionados)
+        self.worker_thread.setTerminationEnabled(True)
+        self.worker_thread.finished.connect(self.__on_finished)
         self.worker_thread.start()
-        self.calc_dlg = QDialog(self)
-        self.calc_dlg.setWindowTitle("Calculando Rutas")
-        
-        layout = QVBoxLayout()
-        mensaje = QLabel(
-            "Calculando rutas para las entregas..."
-            )
-        
-        layout.addWidget(mensaje)
-        
-        self.calc_dlg.setLayout(layout)
+        self.calc_dlg = ConfirmDialog(self)
+        self.calc_dlg.salida_confirmada.connect(self.__on_model_cancel)
         self.calc_dlg.exec()
+    
+    def __on_model_cancel(self):
+        self.worker_thread.terminate()
+        self.calc_dlg.close_directly()
 
     def abrir_ventana_creacion(self):
         camion_ventana = VentanaCreacionCamion(self, self.agregar_camion, self.entregas)
@@ -165,11 +170,48 @@ class VentanaPrincipal(QMainWindow):
         dlg.setLayout(layout)
         dlg.exec()
         
-    def on_finished(self):
-        self.calc_dlg.close()
+    def __on_finished(self):
+        self.calc_dlg.close_directly()
 
 
-class WorkerThread(QThread):
+class ConfirmDialog(QDialog):
+    salida_confirmada = pyqtSignal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        if parent != None:
+            self.setWindowIcon(parent.icono)
+        self.setWindowTitle("Calculando Rutas")
+        texto = "Calculando rutas para las entregas..."
+        layout = QVBoxLayout()
+        mensaje = QLabel(texto)
+        
+        cancelar = QPushButton("Cancelar Ruteo")
+        cancelar.clicked.connect(self.closeEvent)
+        
+        layout.addWidget(mensaje)
+        layout.addWidget(cancelar)       
+        self.setLayout(layout)
+        
+    def closeEvent(self, event):
+        confirmacion = QMessageBox.question(self, "Confirmar", 
+                                             "¿Estás seguro de que quieres cancelar el cálculo de rutas?",
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirmacion == QMessageBox.StandardButton.Yes:
+            # al cancelar ruteo
+            if event == False:
+                self.salida_confirmada.emit()
+                return
+            event.accept()
+            self.salida_confirmada.emit()
+        else:
+            event.ignore()
+    
+    def close_directly(self):
+        self.closeEvent = lambda event: event.accept()
+        self.close()
+
+class RoutesThread(QThread):
     finished = pyqtSignal()
     
     def __init__(self, entregas, camiones):

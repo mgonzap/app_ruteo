@@ -52,11 +52,8 @@ def procesar_dataframe(df: pd.DataFrame, fecha: str):
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
     df = georef.pasar_a_coordenadas(df, test_prints=False)
     
-    # TODO: definir capacidad max de camion
-    df, entregas_separadas = separar_entregas(df, capacidad_max_camion=26)
-    
     #print(entregas_de_un_camion[['DIRECCION', 'N° BULTOS', 'VOLUMEN', 'PESO']])
-    return df, entregas_separadas
+    return df
   
 def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
     filas_separadas = []
@@ -113,9 +110,6 @@ def agrupar_entregas(df: pd.DataFrame):
     for idx, fila in df_con_carpeta.iterrows():
         if idx in idx_eliminados:
             continue
-        if fila['N° CARPETA'] == 'H24010703':
-            print("-----------------DEBUGGING-----------------")
-            print(fila)
         # Elementos pueden estar duplicados
         # queremos todos los elementos que tengan 'DIRECCION', 'COMUNA', 'EJECUTIVO' y 'CLIENTE'
         # con el mismo valor que el elemento que estamos revisando.
@@ -125,14 +119,17 @@ def agrupar_entregas(df: pd.DataFrame):
 
         # si se encuentran elementos así, se suma 'N° BULTOS', 'PESO' y 'VOLUMEN'
         # similares no debería ser empty nunca, puesto que siempre estará el elemento mismo
-        fila['SERVICIO'] = similares['SERVICIO'].str.cat(sep=',')
+        # para evitar duplicados:
+        # TODO: quizas hacer cat y luego split es innecesario
+        lista_carpetas = ','.join(list(set(similares['N° CARPETA'].str.cat(sep=',').split(','))))
+        lista_servicios = ','.join(list(set(similares['SERVICIO'].str.cat(sep=',').split(','))))
+        
+        fila['N° CARPETA'] = lista_carpetas
+        fila['SERVICIO'] = lista_servicios
         fila['N° BULTOS'] = similares['N° BULTOS'].sum()
         fila['VOLUMEN'] = similares['VOLUMEN'].sum()
         fila['PESO'] = similares['PESO'].sum()
-        if fila['N° CARPETA'] == 'H24010703':
-            print("-----------------AGRUPADO-----------------")
-            print(fila)
-            print("similares:", similares.index)
+        
         df = df.drop(similares.index)
         idx_eliminados += similares.index.tolist()
         filas.append(fila)
@@ -141,14 +138,14 @@ def agrupar_entregas(df: pd.DataFrame):
     df = pd.concat([df, df_filas])
     return df
 
-def procesar_query() -> pd.DataFrame:
+def procesar_query(fecha) -> pd.DataFrame:
     """Ejecuta la query a la base de datos y la procesa en un DataFrame similar a los excel de despacho
 
     Returns:
         pd.DataFrame: un DataFrame conteniendo los datos procesados de la query
     """  
     # Realizamos la query y la recibimos en forma de DataFrame
-    df_query = query_datos()
+    df_query = query_datos(fecha)
     
     # fecha entrega se guarda (por timezone de Chile) como objetos datetime.datetime con -03:00, por lo que al pasarlos a
     # pd.datetime resultan como 03:00:00 en vez de 00:00:00. por eso aplicamos el timedelta para corregir, pues excel no usa timezones                  

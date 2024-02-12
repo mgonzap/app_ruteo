@@ -1,5 +1,7 @@
-from ventana_principal import *
-from ventana_fecha import *
+from ventana_principal import VentanaPrincipal
+from ventana_datos import VentanaDatos
+from ventana_fecha import VentanaFecha
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from qt_material import apply_stylesheet
 import sys
@@ -20,23 +22,21 @@ class MainApp(QApplication):
         
     def __on_fecha_elegida(self, fecha):
         self.data_window = VentanaDatos(fecha, self.icono)
+        self.fecha = fecha
         self.data_window.edicion_terminada.connect(self.__on_edicion_terminada)
         self.ventana_fecha.hide()
     
-    def __on_edicion_terminada(self, df, df_separados):
-        if df.empty and df_separados.empty:
+    def __on_edicion_terminada(self, df):
+        if df.empty:
             # TODO: popup/ventana que explique que no hay datos 
             sys.exit()
         try:
             df.to_excel('test/geo_test.xlsx', index=False)
         except PermissionError:
             print("No se pudo escribir 'test/geo_test.xlsx', permiso denegado.")
-        self.ventana_principal = VentanaPrincipal(df, df_separados, self.icono)
+        self.ventana_principal = VentanaPrincipal(df, self.fecha, self.icono)
         self.ventana_principal.show()
         self.ventana_fecha.close()
-        #self.data_window.close()
-        #print("ventana datos cerrada")
-        #print("ventana principal abierta")
 
 if __name__ == "__main__":
     print("Ejecutando main_app")

@@ -34,8 +34,7 @@ def condicion_compuesta(camiones, cluster_sums, n_clusters):
         proposicion = proposicion and condicion(camiones, camion, cluster_sums, n_clusters)
         #if proposicion == False:
             #print(proposicion, camion)
-        #print(proposicion)
-        #print(camion)
+        #print(proposicion, camion)
     return proposicion
 
 class Camion:
@@ -57,16 +56,34 @@ class Entregas:
         # self.nombre_archivo = nombre_archivo
         self.camiones = {
             # 1 vuelta 5 ptos
-            "Sinotruk": Camion(26, 17, 1, 5),
+            "Sinotruk": Camion(26, 17, 2, 7),
             # 1 vuelta 8 ptos
-            "JAC": Camion(16, 6, 1, 8),
+            "JAC": Camion(16, 6, 1, 11),
             # 1 vuelta 6 ptos
             "Hyundai": Camion(6, 0, 1, 6),
             "Externo_1": Camion(17, 16, 1, 7),
             "Externo_2": Camion(17, 16, 1, 7)
         }
-        
+        self.cap_max_camion = 0
         self.df = None
+    
+    def ordenar_camiones(self):
+        camiones_ordenados = sorted(self.camiones.items(), 
+                                    key = (lambda x: x[1].capacidad))
+        sub_cap = [0, 0]
+        for tupla in camiones_ordenados:
+            if tupla[1].capacidad != sub_cap[0]:
+                tupla[1].sub_capacidad = sub_cap[0]
+                sub_cap[1] = sub_cap[0]
+                sub_cap[0] = tupla[1].capacidad
+            else:
+                tupla[1].sub_capacidad = sub_cap[1]
+                
+        camiones_ordenados.reverse()
+        self.camiones = dict(camiones_ordenados)
+        #print(self.camiones)
+        self.cap_max_camion = camiones_ordenados[0][1].capacidad
+        #print('max:', self.cap_max_camion)
 
     # La función ahora retorna True o False dependiendo de si se pudo agregar el camión 
     def crear_camion(self, nombre, capacidad, sub_capacidad, vueltas, maximo_entregas):
@@ -76,32 +93,27 @@ class Entregas:
         return True
 
     # Se recibe el df procesado en procesar_datos.py
-    def cargar_datos(self, df_filtrado, df_separados):
-        self.df = df_filtrado
-        self.df_separados = df_separados
-        print(df_filtrado["VOLUMEN"])
-        self.fecha_filtrado = df_filtrado['FECHA SOLICITUD DESPACHO'].iloc[0]
+    def cargar_datos(self):
+        self.ordenar_camiones()
+        self.df, self.df_separados = separar_entregas(self.df, self.cap_max_camion)
+        #print(self.df["VOLUMEN"])
+        self.fecha_filtrado = self.df['FECHA SOLICITUD DESPACHO'].iloc[0]
         #df = df[df["latitudes"] != -33.464161]
-        latitudes = df_filtrado["LATITUD"]
-        longitudes = df_filtrado["LONGITUD"]
+        latitudes = self.df["LATITUD"]
+        longitudes = self.df["LONGITUD"]
 
-        if len(latitudes) == len(longitudes) == len(list(df_filtrado["VOLUMEN"])):
-            latitudes = np.array(df_filtrado["LATITUD"])
-            longitudes = np.array(df_filtrado["LONGITUD"])
-            volumen = np.array(list(df_filtrado["VOLUMEN"].astype(np.float64)))
-            #indices_eliminar = np.where(latitudes == 999)[0]
-
-            #latitudes = [latitudes[i] for i in range(len(latitudes)) if i not in indices_eliminar]
-            #longitudes = [longitudes[i] for i in range(len(longitudes)) if i not in indices_eliminar]
-            #volumen = [volumen[i] for i in range(len(volumen)) if i not in indices_eliminar]
-            # n_servicio = df_filtrado["SERVICIO"].astype(np.float64)
+        if len(latitudes) == len(longitudes) == len(list(self.df["VOLUMEN"])):
+            latitudes = np.array(self.df["LATITUD"])
+            longitudes = np.array(self.df["LONGITUD"])
+            volumen = np.array(list(self.df["VOLUMEN"].astype(np.float64)))
+            
             # pueden ocurrir n_servicio = ''
-            df_malos = df_filtrado[df_filtrado['SERVICIO'] == '']
+            df_malos = self.df[self.df['SERVICIO'] == '']
             # en este punto carpeta test deberia existir
             df_malos.to_excel('test/malos.xlsx', index=False)
-            #print("n_servicio vacios", df_filtrado[df_filtrado['SERVICIO'] == ''])
+            #print("n_servicio vacios", self.df[self.df['SERVICIO'] == ''])
             n_servicio = np.array([n_servicio.split(',')[0] if len(n_servicio)> 0 else -1
-                                   for n_servicio in df_filtrado["SERVICIO"]]).astype(np.float64)
+                                   for n_servicio in self.df["SERVICIO"]]).astype(np.float64)
 
             self.array_tridimensional = np.array([latitudes, longitudes, volumen, n_servicio]).T
             
@@ -110,12 +122,12 @@ class Entregas:
 
        
 
-    def kmeans_with_constraint(self, K, max_iters=300, constraint_value=28):
+    def kmeans_with_constraint(self, K, max_iters=300, constraint_value=1):
+        #print("constraint:", constraint_value)
         best_centroids = None
         best_labels = None
 
         for _ in range(max_iters):
-            
             centroids = self.array_tridimensional[np.random.choice(len(self.array_tridimensional), K, replace=False)]
 
             for _ in range(max_iters):
@@ -128,12 +140,6 @@ class Entregas:
                 # Reemplaza los valores que cumplen la condición con el valor que elijas (por ejemplo, 0)
                 #valor_elegido = 10000000000.0  # Puedes cambiar este valor según tus necesidades
                 #distances[condicion] = valor_elegido
-                
-                
-                
-                
-                
-                suma = sum(sum(distances))
 
                 labels = np.argmin(distances, axis=1)
                 cluster_sums = np.array([self.array_tridimensional[labels == k][:, 2].sum() for k in range(K)])
@@ -198,12 +204,13 @@ class Entregas:
 
     def ejecutar_modelo(self):
         #print(self.camiones)
+        self.cargar_datos()
         K = self.sumar_vueltas()
         K = 15
         
         for i in range(2, K):
             try:
-                centroids, labels = self.kmeans_with_constraint(i)
+                centroids, labels = self.kmeans_with_constraint(i, constraint_value=self.cap_max_camion)
             except Exception as e:
                 print(f'{type(e).__name__}: {e}')
                 return
@@ -259,8 +266,8 @@ class Entregas:
                 # CONDUCTOR ES POR CAMION, 1 A 1
                 # diccionario conductores donde llave es nombre camion
                 cols = [
-                    'RUTA', '(m³) TOTAL RUTA', 'ORDEN', 'EJECUTIVO CUENTA', 'CLIENTE', 'N° CONTENEDOR',
-                    'N° SERVICIO', '(m³)', 'BULTOS', 'FECHAS', 'CAMIÓN',
+                    'RUTA', '(m³) TOTAL RUTA', 'ORDEN', 'N° CARPETA', 'EJECUTIVO CUENTA', 'CLIENTE', 
+                    'N° CONTENEDOR', 'N° SERVICIO', '(m³)', 'BULTOS', 'FECHAS', 'CAMIÓN',
                     'DIRECCIÓN', 'COMUNA', 'EMPRESA EXT', 'CONTACTO',
                     'OBSERVACIONES', 'CHOFER', 'ESTADO'
                 ]
@@ -270,8 +277,7 @@ class Entregas:
                 for k in range(i):
                     # cluster_points: [LAT, LONG, VOL, SERVICIO]
                     # SERVICIO de cluster_points corresponde a df['SERVICIO'].split(',')[0]
-                    # i: N TOTAL RUTAS
-                    # k: RUTA ACTUAL
+                    # i: N TOTAL RUTAS, k: RUTA ACTUAL
                     cluster_points = self.array_tridimensional[labels == k]
                     cluster_sum = cluster_points[:, 2].sum()
                     
@@ -287,6 +293,7 @@ class Entregas:
                         ruta = k + 1
                         vol_ruta = cluster_sum.round(2)
                         orden = 0 # TODO: como se determina?
+                        n_carpeta = fila_df['N° CARPETA'].values[0]
                         ejecutivo = fila_df['EJECUTIVO'].values[0]
                         cliente = fila_df['CLIENTE'].values[0]
                         contenedor = fila_df['CONTENEDOR'].values[0]
@@ -315,10 +322,10 @@ class Entregas:
                         estado = 'SIN INFORMACIÓN'
                         
                         fila: pd.Series = pd.Series([
-                            ruta, vol_ruta, orden, ejecutivo, cliente, contenedor,
-                            n_servicio, volumen, bultos, fechas_str, camion_str,
-                            direccion, comuna, empresa_ext, contacto,
-                            observaciones, chofer, estado
+                                ruta, vol_ruta, orden, n_carpeta, ejecutivo, cliente, contenedor,
+                                n_servicio, volumen, bultos, fechas_str, camion_str,
+                                direccion, comuna, empresa_ext, contacto,
+                                observaciones, chofer, estado
                             ],
                             index=cols)
                         lista_filas.append(fila)
@@ -330,6 +337,7 @@ class Entregas:
                     # asignamos valores (notar que algunos difieren del df normal)
                     vol_ruta = np.float64(fila_df['VOLUMEN']).round(2)
                     orden = 0 # TODO: como se determina?
+                    n_carpeta = fila_df['N° CARPETA']
                     ejecutivo = fila_df['EJECUTIVO']
                     cliente = fila_df['CLIENTE']
                     contenedor = fila_df['CONTENEDOR']
@@ -352,10 +360,10 @@ class Entregas:
                     #estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
                     estado = 'SIN INFORMACIÓN'
                     fila: pd.Series = pd.Series([
-                        ruta, vol_ruta, orden, ejecutivo, cliente, contenedor,
-                        n_servicio, volumen, bultos, fechas_str, camion_str,
-                        direccion, comuna, empresa_ext, contacto,
-                        observaciones, chofer, estado
+                            ruta, vol_ruta, orden, n_carpeta, ejecutivo, cliente, contenedor,
+                            n_servicio, volumen, bultos, fechas_str, camion_str,
+                            direccion, comuna, empresa_ext, contacto,
+                            observaciones, chofer, estado
                         ],
                         index=cols)
                     lista_filas.append(fila)

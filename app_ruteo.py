@@ -55,9 +55,9 @@ class Entregas:
         
         # self.nombre_archivo = nombre_archivo
         self.camiones = {
-            # 1 vuelta 5 ptos
+            # 1 vuelta 5 puntos
             "Sinotruk": Camion(26, 17, 1, 5),
-            # 1 vuelta 8 ptos
+            # 1 vuelta 8 puntos
             "JAC": Camion(16, 6, 2, 5),
             # 1 vuelta 6 ptos
             "Hyundai": Camion(6, 0, 1, 6),

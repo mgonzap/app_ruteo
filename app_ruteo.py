@@ -56,9 +56,9 @@ class Entregas:
         # self.nombre_archivo = nombre_archivo
         self.camiones = {
             # 1 vuelta 5 ptos
-            "Sinotruk": Camion(26, 17, 2, 7),
+            "Sinotruk": Camion(26, 17, 1, 5),
             # 1 vuelta 8 ptos
-            "JAC": Camion(16, 6, 1, 11),
+            "JAC": Camion(16, 6, 2, 5),
             # 1 vuelta 6 ptos
             "Hyundai": Camion(6, 0, 1, 6),
             "Externo_1": Camion(17, 16, 1, 7),
@@ -300,7 +300,9 @@ class Entregas:
                         n_servicio = fila_df['SERVICIO'].values[0]
                         volumen = point[2].round(2)
                         bultos = fila_df['N° BULTOS'].values[0]
-                        fechas_str = f"ETA: {fila_df['ETA'].values[0]} DESC: {fila_df['F.DESCONSOLIDADO'].values[0]} PROG: {fila_df['FECHA PROG DESPACHO'].values[0]} ENT: " # TODO: formatear string "ETA: DESC: PROG: ENT:"
+                        fechas_str = f"ETA: {fila_df['ETA'].values[0]} " + \
+                            f"DESC: {fila_df['F.DESCONSOLIDADO'].values[0]} " + \
+                            f"PROG: {fila_df['FECHA PROG DESPACHO'].values[0] if fila_df['FECHA PROG DESPACHO'].values[0] != 'S/I' else fila_df['FECHA SOLICITUD DESPACHO'].values[0]} ENT: "
                         # DETERMINAR CAMION:
                         # sub capacidad <= VOL_TOTAL_CLUSTER <= capacidad
                         camion_str = "S/I"

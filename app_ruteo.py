@@ -60,7 +60,7 @@ class Entregas:
             # 1 vuelta 8 puntos
             "JAC": Camion(16, 6, 2, 5),
             # 1 vuelta 6 ptos
-            "Hyundai": Camion(6, 0, 1, 6),
+            "Hyundai": Camion(6, 0, 2, 6),
             "Externo_1": Camion(17, 16, 1, 7),
             "Externo_2": Camion(17, 16, 1, 7)
         }

@@ -39,6 +39,6 @@ class MainApp(QApplication):
         self.ventana_fecha.close()
 
 if __name__ == "__main__":
-    print("Ejecutando main_app")
+    print("Ejecutando aplicación de ruteo...")
     app = MainApp()
     sys.exit(app.exec())

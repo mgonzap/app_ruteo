@@ -1,7 +1,12 @@
-*.xlsx
-*.txt
+**/*.xlsx
+**/*.txt
+!requirements.txt
 mapas/
 pedidos/
 rutas/
 logo/
 base_datos.py
+__pycache__/
+retiros/
+test/
+resumen_despachos/

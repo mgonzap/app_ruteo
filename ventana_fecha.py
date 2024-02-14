@@ -15,7 +15,7 @@ class VentanaFecha(QMainWindow):
 
         layout = QVBoxLayout()
         
-        self.label = QLabel("Por favor seleccione la fecha para buscar entregas.")
+        self.label = QLabel("Seleccione la fecha para la cual se buscarán entregas.")
         layout.addWidget(self.label)
 
         self.calendar = QCalendarWidget()

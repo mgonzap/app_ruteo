@@ -62,12 +62,12 @@ class VentanaPrincipal(QMainWindow):
         self.v_combo_layout.addWidget(self.combo_camiones)
 
         ### Boton Agregar Camion
-        self.agregar_button = QPushButton("Agregar Camión a Lista", self)
+        self.agregar_button = QPushButton("Agregar Camión a Ruteo", self)
         self.agregar_button.clicked.connect(self.agregar_camion)
         self.v_combo_layout.addWidget(self.agregar_button)
         
         ### Boton Quitar Camion
-        self.quitar_button = QPushButton("Quitar Camión de Lista", self)
+        self.quitar_button = QPushButton("Quitar Camión de Ruteo", self)
         self.quitar_button.setProperty('class', 'danger')
         self.quitar_button.clicked.connect(self.quitar_camion)
         self.v_combo_layout.addWidget(self.quitar_button)

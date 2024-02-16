@@ -7,17 +7,17 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from app_ruteo import Entregas, Camion
 from ventana_camiones import VentanaCamion
+from ventana_despachos import VentanaDespachos
 from copy import deepcopy
 
 class VentanaPrincipal(QMainWindow):
-
     def __init__(self, df_filtrado, fecha, icono):
         super().__init__()
 
         self.worker_thread = None
         self.entregas = Entregas()
         # cargamos el DataFrame
-        self.entregas.df_original = df_filtrado
+        self.df = df_filtrado
         
         self.setWindowIcon(icono)
         self.icono = icono
@@ -56,7 +56,7 @@ class VentanaPrincipal(QMainWindow):
         
         ### Boton para ver Despachos
         self.despachos_button = QPushButton("Ver lista de despachos", self)
-        self.despachos_button.clicked.connect(self.ver_despachos)
+        self.despachos_button.clicked.connect(self.ver_ventana_despachos)
         self.v_combo_layout.addWidget(self.despachos_button)
         
         self.v_combo_layout.addSpacing(30)
@@ -126,7 +126,7 @@ class VentanaPrincipal(QMainWindow):
         for nombre in self.camiones_seleccionados:
             camiones_ruteo[nombre] = self.dict_camiones[nombre]
         self.entregas.camiones = camiones_ruteo
-        self.worker_thread = RoutesThread(self.entregas, self.camiones_seleccionados)
+        self.worker_thread = RoutesThread(self.df, self.entregas, self.camiones_seleccionados)
         self.worker_thread.setTerminationEnabled(True)
         self.worker_thread.finished.connect(self.__on_finished)
         self.worker_thread.start()
@@ -134,8 +134,9 @@ class VentanaPrincipal(QMainWindow):
         self.calc_dlg.salida_confirmada.connect(self.__on_model_cancel)
         self.calc_dlg.exec()
     
-    def ver_despachos(self):
-        print("ver despachos")
+    def ver_ventana_despachos(self):
+        self.ventana_despachos = VentanaDespachos(self.df, self.icono)
+        self.ventana_despachos.show()
     
     def __on_model_cancel(self):
         self.worker_thread.terminate()
@@ -264,9 +265,10 @@ class ConfirmDialog(QDialog):
 class RoutesThread(QThread):
     finished = pyqtSignal()
     
-    def __init__(self, entregas, camiones):
+    def __init__(self, df, entregas, camiones):
         super().__init__()
         self.entregas: Entregas = entregas
+        self.entregas.df_original = df
         self.camiones = camiones
 
     def run(self):

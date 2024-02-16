@@ -1,5 +1,5 @@
 from ventana_principal import VentanaPrincipal
-from ventana_tablas import VentanaTablas
+from ventana_correcciones import VentanaCorrecciones
 from ventana_fecha import VentanaFecha
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
@@ -44,7 +44,7 @@ class MainApp(QApplication):
             print('exiting program')
             sys.exit()
         self.df = df
-        self.ventana_tablas = VentanaTablas(self.df, self.icono)
+        self.ventana_tablas = VentanaCorrecciones(self.df, self.icono)
         self.ventana_tablas.edicion_terminada.connect(self.__on_edicion_terminada)
         self.confirmar.close_directly()
         self.ventana_tablas.show()

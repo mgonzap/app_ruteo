@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     QAbstractTableModel, Qt, QSortFilterProxyModel, pyqtSignal, 
-    QSize, QModelIndex, QTimer
+    QSize, QModelIndex
 )
 from PyQt6.QtGui import QAction, QGuiApplication
 import pandas as pd
@@ -12,11 +12,10 @@ import georef
 from urllib.parse import quote
 from ventana_navegador import VentanaNavegador
 
-# Clase dedicada al procesamiento de datos (temporalmente, desde el excel)
-# En caso de que los datos necesiten procesamiento extra (ej, georef no logra obtener coordenadas)
-# se pide ayuda a usuario para corregir
+# Ventana dedicada al procesamiento de datos por parte del usuario
+# En caso de que los datos necesiten procesamiento manual (ej, georef no logra obtener coordenadas)
 
-class VentanaTablas(QMainWindow):
+class VentanaCorrecciones(QMainWindow):
     edicion_terminada = pyqtSignal(pd.DataFrame)
     def __init__(self, df, icono):
         super(QMainWindow, self).__init__()

@@ -8,10 +8,6 @@ from procesamiento_datos import obtener_dataframe
 
 path_icono = "logo\\WSC-LOGO2.ico"
 
-# TODO:
-class IconHolder():
-    pass
-
 class ConfirmDialog(QDialog):
     salida_confirmada = pyqtSignal()
     

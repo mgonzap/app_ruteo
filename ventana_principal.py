@@ -17,7 +17,7 @@ class VentanaPrincipal(QMainWindow):
         self.worker_thread = None
         self.entregas = Entregas()
         # cargamos el DataFrame
-        self.entregas.df = df_filtrado
+        self.entregas.df_original = df_filtrado
         
         self.setWindowIcon(icono)
         self.icono = icono
@@ -53,6 +53,11 @@ class VentanaPrincipal(QMainWindow):
         self.fecha_line_edit = QLabel(f"Se calcularán rutas para: {fecha}", self)
         self.fecha_line_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v_combo_layout.addWidget(self.fecha_line_edit)
+        
+        ### Boton para ver Despachos
+        self.despachos_button = QPushButton("Ver lista de despachos", self)
+        self.despachos_button.clicked.connect(self.ver_despachos)
+        self.v_combo_layout.addWidget(self.despachos_button)
         
         self.v_combo_layout.addSpacing(30)
 
@@ -128,6 +133,9 @@ class VentanaPrincipal(QMainWindow):
         self.calc_dlg = ConfirmDialog(self)
         self.calc_dlg.salida_confirmada.connect(self.__on_model_cancel)
         self.calc_dlg.exec()
+    
+    def ver_despachos(self):
+        print("ver despachos")
     
     def __on_model_cancel(self):
         self.worker_thread.terminate()

@@ -1,3 +1,4 @@
+from src.base_classes.base_ventana import BaseVentana
 from ventana_principal import VentanaPrincipal
 from ventana_correcciones import VentanaCorrecciones
 from ventana_fecha import VentanaFecha
@@ -12,9 +13,10 @@ import sys
 class MainApp(QApplication):
     def __init__(self):
         super(QApplication, self).__init__(["AppRuteo"])
-        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        BaseVentana.setIcon(QIcon("logo\\WSC-LOGO2.ico"))
         
-        self.ventana_fecha = VentanaFecha(self.icono)
+        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        self.ventana_fecha = VentanaFecha()
         self.ventana_fecha.fecha_seleccionada.connect(self.__on_fecha_elegida)
         self.ventana_fecha.show()
         
@@ -43,6 +45,7 @@ class MainApp(QApplication):
             # TODO: popup/ventana que explique que no hay datos
             print('exiting program')
             sys.exit()
+        BaseVentana.setDataFrame(df)
         self.df = df
         self.ventana_tablas = VentanaCorrecciones(self.df, self.icono)
         self.ventana_tablas.edicion_terminada.connect(self.__on_edicion_terminada)

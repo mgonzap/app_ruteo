@@ -1,4 +1,4 @@
-from src.base_classes import Ventana
+from ventanas_base import Ventana
 from PyQt6.QtCore import QUrl, pyqtSignal
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (

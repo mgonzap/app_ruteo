@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from app_ruteo import Entregas, Camion
-from src.base_classes import VentanaDataframe
+from ventanas_base import VentanaDataframe
 from ventana_camiones import VentanaCamion
 from ventanas_despachos import VentanaDespachos
 from copy import deepcopy

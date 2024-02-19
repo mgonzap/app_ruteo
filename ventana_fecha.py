@@ -1,10 +1,10 @@
-from src.base_classes.base_ventana import BaseVentana
+from ventanas_base import Ventana
 from PyQt6.QtWidgets import (
     QVBoxLayout, QCalendarWidget, QPushButton, QWidget, QLabel
 )
 from PyQt6.QtCore import pyqtSignal
 
-class VentanaFecha(BaseVentana):
+class VentanaFecha(Ventana):
     fecha_seleccionada = pyqtSignal(str)
     def __init__(self, parent=None):
         super().__init__(
@@ -31,6 +31,5 @@ class VentanaFecha(BaseVentana):
 
     def __onDatePicked(self):
         selected_date = self.calendar.selectedDate()
-        #print("Fecha elegida:", selected_date.toString('dd-MM-yyyy'))
         self.setSafeToClose(True)
         self.fecha_seleccionada.emit(selected_date.toString('dd-MM-yyyy'))

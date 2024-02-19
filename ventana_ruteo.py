@@ -1,39 +1,36 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QComboBox, QListWidget, QListWidgetItem, QDialog,
     QMessageBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from app_ruteo import Entregas, Camion
+from src.base_classes import VentanaDataframe
 from ventana_camiones import VentanaCamion
-from ventana_despachos import VentanaDespachos
+from ventanas_despachos import VentanaDespachos
 from copy import deepcopy
 
-class VentanaPrincipal(QMainWindow):
-    def __init__(self, df_filtrado, fecha, icono):
-        super().__init__()
 
+class VentanaRuteo(VentanaDataframe):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(
+            parent= parent, title= "Modelo de Optimización de rutas WScargo",
+            safe_to_close= False
+        )
         self.worker_thread = None
         self.entregas = Entregas()
-        # cargamos el DataFrame
-        self.df = df_filtrado
-        
-        self.setWindowIcon(icono)
-        self.icono = icono
 
         self.camiones_seleccionados = list(self.entregas.camiones.keys())
         self.dict_camiones = deepcopy(self.entregas.camiones)
 
-        self.setWindowTitle("Modelo de Optimización de rutas WScargo")
         self.setGeometry(100, 100, 700, 400)
 
-        self.central_widget = QWidget(self)
-        self.central_widget.setContentsMargins(10, 5, 10, 5)
-        self.setCentralWidget(self.central_widget)
+        self.setCentralWidget(QWidget(self))
+        self.centralWidget().setContentsMargins(10, 5, 10, 5)
 
         # Layout Base
-        self.layout = QHBoxLayout(self.central_widget)
+        self.layout = QHBoxLayout(self.centralWidget())
         
         ## Layout para ComboBox y sus botones (izquierda de la pantalla)
         self.v_combo_layout = QVBoxLayout()
@@ -41,8 +38,7 @@ class VentanaPrincipal(QMainWindow):
         
         ### Logo
         self.logo_label = QLabel()
-        self.pixmap_test = QPixmap("logo\\WSC-LOGO.png")
-        self.logo_label.setPixmap(self.pixmap_test)
+        self.logo_label.setPixmap(QPixmap("logo\\WSC-LOGO.png"))
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v_combo_layout.addWidget(self.logo_label)
         
@@ -50,14 +46,12 @@ class VentanaPrincipal(QMainWindow):
         self.v_combo_layout.addSpacing(30)
         
         ### Fecha
-        self.fecha_line_edit = QLabel(f"Se calcularán rutas para: {fecha}", self)
+        self.fecha_line_edit = QLabel(f"Se calcularán rutas para: {self.getFecha()}", self)
         self.fecha_line_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v_combo_layout.addWidget(self.fecha_line_edit)
         
         ### Boton para ver Despachos
-        self.despachos_button = QPushButton("Ver lista de despachos", self)
-        self.despachos_button.clicked.connect(self.ver_ventana_despachos)
-        self.v_combo_layout.addWidget(self.despachos_button)
+        self.v_combo_layout.addWidget(self.createQPushButton("Ver lista de despachos", self.ver_ventana_despachos))
         
         self.v_combo_layout.addSpacing(30)
 
@@ -67,25 +61,13 @@ class VentanaPrincipal(QMainWindow):
         self.v_combo_layout.addWidget(self.combo_camiones)
 
         ### Boton Agregar Camion
-        self.agregar_button = QPushButton("Agregar Camión a Ruteo", self)
-        self.agregar_button.clicked.connect(self.agregar_camion)
-        self.v_combo_layout.addWidget(self.agregar_button)
-        
+        self.v_combo_layout.addWidget(self.createQPushButton("Agregar Camión a Ruteo", self.agregar_camion))
         ### Boton Quitar Camion
-        self.quitar_button = QPushButton("Quitar Camión de Ruteo", self)
-        self.quitar_button.setProperty('class', 'danger')
-        self.quitar_button.clicked.connect(self.quitar_camion)
-        self.v_combo_layout.addWidget(self.quitar_button)
-        
+        self.v_combo_layout.addWidget(self.createQPushButton("Quitar Camión de Ruteo", self.quitar_camion))
         ### Boton Editar Camion
-        self.editar_boton = QPushButton("Editar Camión", self)
-        self.editar_boton.clicked.connect(self.abrir_ventana_edicion)
-        self.v_combo_layout.addWidget(self.editar_boton)
-        
+        self.v_combo_layout.addWidget(self.createQPushButton("Editar Camión", self.abrir_ventana_edicion))
         ### Boton Crear Camion
-        self.crear_boton = QPushButton("Crear Nuevo Camión", self)
-        self.crear_boton.clicked.connect(self.abrir_ventana_creacion)
-        self.v_combo_layout.addWidget(self.crear_boton)
+        self.v_combo_layout.addWidget(self.createQPushButton("Crear Nuevo Camión", self.abrir_ventana_creacion))
         
         self.layout.addLayout(self.v_combo_layout, 35)
         
@@ -94,9 +76,7 @@ class VentanaPrincipal(QMainWindow):
         
         # Layout para la lista de camiones y el calculo de resultados
         self.v_list_layout = QVBoxLayout()
-
-        lista_label = QLabel("Camiones considerados para el cálculo de rutas:")
-        self.v_list_layout.addWidget(lista_label)
+        self.v_list_layout.addWidget(QLabel("Camiones considerados para el cálculo de rutas:"))
         # La lista de camiones reflejara los camiones considerados para el cálculo
         self.lista_camiones = QListWidget(self)
         self.v_list_layout.addWidget(self.lista_camiones)
@@ -105,11 +85,8 @@ class VentanaPrincipal(QMainWindow):
             nuevo_item = QListWidgetItem(camion)
             nuevo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lista_camiones.addItem(nuevo_item)
-
-        self.worker_thread = None
-        self.calcular_button = QPushButton("Calcular Vueltas y Servicios", self)
-        self.calcular_button.clicked.connect(self.ejecutar_modelo)
-        self.v_list_layout.addWidget(self.calcular_button)
+            
+        self.v_list_layout.addWidget(self.createQPushButton("Calcular Vueltas y Servicios", self.ejecutar_modelo))
         
         self.layout.addLayout(self.v_list_layout, 65)
 
@@ -126,7 +103,7 @@ class VentanaPrincipal(QMainWindow):
         for nombre in self.camiones_seleccionados:
             camiones_ruteo[nombre] = self.dict_camiones[nombre]
         self.entregas.camiones = camiones_ruteo
-        self.worker_thread = RoutesThread(self.df, self.entregas, self.camiones_seleccionados)
+        self.worker_thread = RoutesThread(self.getDataFrame(), self.entregas, self.camiones_seleccionados)
         self.worker_thread.setTerminationEnabled(True)
         self.worker_thread.finished.connect(self.__on_finished)
         self.worker_thread.start()
@@ -135,7 +112,7 @@ class VentanaPrincipal(QMainWindow):
         self.calc_dlg.exec()
     
     def ver_ventana_despachos(self):
-        self.ventana_despachos = VentanaDespachos(self.df, self.icono)
+        self.ventana_despachos = VentanaDespachos(self)
         self.ventana_despachos.show()
     
     def __on_model_cancel(self):
@@ -209,17 +186,8 @@ class VentanaPrincipal(QMainWindow):
         self.camiones_seleccionados.remove(camion_a_quitar)
         self.lista_camiones.takeItem(self.lista_camiones.currentRow())
     
-    def generar_advertencia(self, texto):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Error")
-        
-        layout = QVBoxLayout()
-        mensaje = QLabel(texto)
-        
-        layout.addWidget(mensaje)
-        
-        dlg.setLayout(layout)
-        dlg.exec()
+    def generar_advertencia(self, texto: str) -> None:
+        QMessageBox.warning(self, 'Error', texto)
         
     def __on_finished(self):
         self.calc_dlg.close_directly()
@@ -230,8 +198,7 @@ class ConfirmDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        if parent != None:
-            self.setWindowIcon(parent.icono)
+        self.setWindowIcon(VentanaDataframe.getIcon())
         self.setWindowTitle("Calculando Rutas")
         texto = "Calculando rutas para las entregas..."
         layout = QVBoxLayout()
@@ -245,9 +212,10 @@ class ConfirmDialog(QDialog):
         self.setLayout(layout)
         
     def closeEvent(self, event):
-        confirmacion = QMessageBox.question(self, "Confirmar", 
-                                             "¿Estás seguro de que quieres cancelar el cálculo de rutas?",
-                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        confirmacion = QMessageBox.question(
+            self, "Confirmar", 
+            "¿Estás seguro de que quieres cancelar el cálculo de rutas?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if event == False:
             # al cancelar ruteo
             self.salida_confirmada.emit()

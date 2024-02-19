@@ -45,7 +45,7 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
     # estos strings vienen la mayoría en formato 'NOMBRE_EXTERNO | DIRECCION', sin embargo
     # existe una excepción que es TVP.
     
-    #print(df_filtrado[["DIRECCION", "VOLUMEN"]])
+    dict_dir = None
     for direccion, datos_externo in zip(df_filtrado["DIRECCION"], df_filtrado["DATOS TRANSPORTE EXTERNO"]):
         #print(datos_externo)
         if datos_externo != "NO APLICA":
@@ -54,22 +54,16 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
             #print("Georreferencia a transporte externo")
             try:
                 datos_externo = datos_externo[1]
-                #print("se pudo splitear")
+                dict_dir = direccion_a_dict(datos_externo)
             except IndexError:
                 datos_externo = datos_externo[0]
-                #print("no se pudo papito....")
-            location = geocode(datos_externo, country_codes="CL")
-            if location is None:
-                #print("fallo geolocalizacion de sucursal transporte externo")
-                pass
+                dict_dir = datos_externo
         else:
-            location = geocode(direccion, country_codes="CL")
-            if location is None:
-                #print("fallo geolocalizacion de direccion")
-                pass
+            dict_dir = direccion_a_dict(direccion)
+
+        location = geocode(dict_dir, country_codes="CL")
         
         if location is not None:
-            #print("se encontro")
             latitud = location.latitude
             longitud = location.longitude
             latitudes.append(latitud)
@@ -111,6 +105,26 @@ def pasar_a_coordenadas(df_filtrado, test_prints=False):
         print(f"No se pudo escribir '{nombre_archivo}', permiso denegado.")
     
     return df_filtrado
+
+# Nominatim tiene 2 formas de hacer query, normal sin estructura, y una estructurada
+# La estructurada corresponde a recibir un diccionario con parametros, los que nos interesan son:
+#     street:  housenumber and streetname
+#       city:  city
+#      state:  state
+#    country:  country
+
+# las direcciones, ya sean de empresa ext o no, vienen en el siguiente formato:
+# dir.direccion,' ',dir.numero,', ',comunas.nombre,', ',region.nombre
+# tdr.calle_empresa_ext,' ',tdr.numeracion_empresa_ext,', ',comunas2.nombre,', ',region2.nombre
+def direccion_a_dict(dir: str) -> dict:
+    data = dir.split(", ")
+    dict_dir = {
+        'street': ", ".join(data[:-2]).strip(),
+        'city': data[-2].strip(),
+        'state': data[-1].strip(),
+        'country': 'Chile'
+    }
+    return dict_dir
 
 
 def actualizar_coordenadas(df_actualizado) -> None:

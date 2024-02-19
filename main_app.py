@@ -1,7 +1,11 @@
-from ventana_principal import VentanaPrincipal
-from ventana_correcciones import VentanaCorrecciones
+from ventanas_base import Ventana, VentanaDataframe
+from ventana_ruteo import VentanaRuteo
 from ventana_fecha import VentanaFecha
-from PyQt6.QtWidgets import QApplication
+from ventanas_despachos import (
+    VentanaDespachosValidarPago,
+    VentanaDespachosCoordenadas
+)
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QIcon
 from utils_qt import ConfirmDialog, DataThread
 import sys
@@ -12,14 +16,15 @@ import sys
 class MainApp(QApplication):
     def __init__(self):
         super(QApplication, self).__init__(["AppRuteo"])
-        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        Ventana.setIcon(QIcon("logo\\WSC-LOGO2.ico"))
         
-        self.ventana_fecha = VentanaFecha(self.icono)
+        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        self.ventana_fecha = VentanaFecha()
         self.ventana_fecha.fecha_seleccionada.connect(self.__on_fecha_elegida)
         self.ventana_fecha.show()
         
     def __on_fecha_elegida(self, fecha):
-        self.fecha = fecha
+        VentanaDataframe.setFecha(fecha)
         # iniciamos worker thread encargado de obtener los datos
         self.worker_thread = DataThread(fecha)
         self.worker_thread.setTerminationEnabled(True)
@@ -37,21 +42,28 @@ class MainApp(QApplication):
         self.confirmar.exec()
     
     def __on_datos_recibidos(self, df):
-        print("datos recibidos")
-        print(df)
-        if df.empty:
-            # TODO: popup/ventana que explique que no hay datos
-            print('exiting program')
+        VentanaDataframe.setDataFrame(df)
+        if VentanaDataframe.getDataFrame().empty:
+            msg = QMessageBox(
+                QMessageBox.Icon.Critical,
+                "Error", "No se han encontrado despachos para la fecha indicada. La aplicación se cerrará."
+            )
+            msg.setWindowIcon(Ventana.getIcon())
+            msg.exec()
             sys.exit()
-        self.df = df
-        self.ventana_tablas = VentanaCorrecciones(self.df, self.icono)
-        self.ventana_tablas.edicion_terminada.connect(self.__on_edicion_terminada)
+        self.ventana_tipo_despacho = VentanaDespachosValidarPago()
+        self.ventana_tipo_despacho.finished.connect(self.__on_despachos_verificados)
         self.confirmar.close_directly()
-        self.ventana_tablas.show()
+        self.ventana_tipo_despacho.show()
+        return
     
-    def __on_edicion_terminada(self, df):
-        print('abriendo ventana principal')
-        self.ventana_principal = VentanaPrincipal(df, self.fecha, self.icono)
+    def __on_despachos_verificados(self):
+        self.ventana_coordenadas = VentanaDespachosCoordenadas()
+        self.ventana_coordenadas.finished.connect(self.__on_coordenadas_corregidas)
+        self.ventana_coordenadas.show()
+    
+    def __on_coordenadas_corregidas(self):
+        self.ventana_principal = VentanaRuteo()
         self.ventana_principal.show()
 
 if __name__ == "__main__":

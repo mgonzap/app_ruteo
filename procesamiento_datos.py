@@ -24,6 +24,9 @@ def obtener_dataframe(fecha: str):
     
     df = procesar_query(fecha)
     
+    if df.empty:
+        return df
+    
     try:
         df.to_excel('test/excel_procesado.xlsx', index=False)
     except PermissionError:
@@ -166,7 +169,8 @@ def procesar_query(fecha) -> pd.DataFrame:
         df_query[col] = df_query[col].apply(convertir_a_tz_chile)
     #print(df_query['fecha_despacho_retiro'])
     
-    #print(df_query)  
+    if df_query.empty:
+        return df_query
       
     try:
         if not os.path.exists('test'):

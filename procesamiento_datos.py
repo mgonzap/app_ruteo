@@ -3,11 +3,12 @@ import pandas as pd
 from datetime import date, timedelta
 from base_datos import *
 import georef
+import pytz
 
 # Para procesar datos de query / xlsx
 # Funcion temporal para cargar excel, idealmente se manejaria por query
-def procesar_dataframe(df: pd.DataFrame, fecha: str):
-    """Procesa datos desde query o archivo xlsx, realizando un filtro por fecha
+def obtener_dataframe(fecha: str):
+    """Procesa datos desde query, realizando un filtro por fecha
     para obtener las filas donde 'FECHA SOLICITUD DESPACHO' corresponda al día de mañana.
     Luego se entregan los datos como DataFrame a georef, quien añade columnas de latitud y longitud.
 
@@ -18,17 +19,18 @@ def procesar_dataframe(df: pd.DataFrame, fecha: str):
         pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
     """
     
-    fecha_filtrado = fecha
-    print("fecha hoy:", date.today().strftime('%d-%m-%Y'))
-    print("fecha a filtrar:", fecha_filtrado)
+    print("Fecha de hoy:", date.today().strftime('%d-%m-%Y'))
+    print("Fecha a filtrar:", fecha)
+    
+    df = procesar_query(fecha)
+    
+    if df.empty:
+        return df
     
     try:
         df.to_excel('test/excel_procesado.xlsx', index=False)
     except PermissionError:
         print("No se pudo escribir 'test/excel_procesado.xlsx', permiso denegado.")
-
-    # existe FECHA_SOLICITUD_DESPACHO y FECHA_PROG_DESPACHO
-    df = df[df["FECHA SOLICITUD DESPACHO"].str[:12] == fecha_filtrado]
     
     # retiros directamente en bodega, por lo tanto no lo georreferenciamos
     # Filtrar y guardar en su propio DataFrame
@@ -36,9 +38,9 @@ def procesar_dataframe(df: pd.DataFrame, fecha: str):
     try:
         if not os.path.exists('retiros'):
             os.makedirs('retiros')
-        df_retiros.to_excel(f"retiros/retiros-{fecha_filtrado}.xlsx", index=False)
+        df_retiros.to_excel(f"retiros/retiros-{fecha}.xlsx", index=False)
     except PermissionError:
-        print(f"No se pudo escribir 'retiros/retiros-{fecha_filtrado}.xlsx', permiso denegado.")
+        print(f"No se pudo escribir 'retiros/retiros-{fecha}.xlsx', permiso denegado.")
     
     df = df[~df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])]
     
@@ -51,8 +53,7 @@ def procesar_dataframe(df: pd.DataFrame, fecha: str):
     # Procesamos los datos mediante georef
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
     df = georef.pasar_a_coordenadas(df, test_prints=False)
-    
-    #print(entregas_de_un_camion[['DIRECCION', 'N° BULTOS', 'VOLUMEN', 'PESO']])
+    df.reset_index(drop=True, inplace=True)
     return df
   
 def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
@@ -88,8 +89,10 @@ def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
     entregas_separadas = pd.DataFrame(filas_separadas, columns=df.columns)
     return df, entregas_separadas
 
+
 def agrupar_entregas(df: pd.DataFrame):
     # TODO: ahora agruparemos por DIRECCIÓN y CLIENTE, concatenamos todo lo q no sea BULTOS VOLUMEN PESO
+    # TODO: algunas cosas deberían tener prioridad, por ejemplo 'REVISAR DESPACHO GRATUITO NO INCLUIDO' en tipo de entrega
 
     # La entrega que tenga N° CARPETA != None es la 'principal'.
     # Las demas deberian coincidir en direccion, comuna, cliente
@@ -111,7 +114,7 @@ def agrupar_entregas(df: pd.DataFrame):
         if idx in idx_eliminados:
             continue
         # Elementos pueden estar duplicados
-        # queremos todos los elementos que tengan 'DIRECCION', 'COMUNA', 'EJECUTIVO' y 'CLIENTE'
+        # queremos todos los elementos que tengan 'DIRECCION', 'COMUNA' y 'CLIENTE'
         # con el mismo valor que el elemento que estamos revisando.
         similares = df[(df['DIRECCION'] == fila['DIRECCION'])
                        & (df['COMUNA'] == fila['COMUNA'])
@@ -138,6 +141,7 @@ def agrupar_entregas(df: pd.DataFrame):
     df = pd.concat([df, df_filas])
     return df
 
+
 def procesar_query(fecha) -> pd.DataFrame:
     """Ejecuta la query a la base de datos y la procesa en un DataFrame similar a los excel de despacho
 
@@ -147,13 +151,26 @@ def procesar_query(fecha) -> pd.DataFrame:
     # Realizamos la query y la recibimos en forma de DataFrame
     df_query = query_datos(fecha)
     
-    # fecha entrega se guarda (por timezone de Chile) como objetos datetime.datetime con -03:00, por lo que al pasarlos a
-    # pd.datetime resultan como 03:00:00 en vez de 00:00:00. por eso aplicamos el timedelta para corregir, pues excel no usa timezones                  
-    df_query['fecha_entrega'] = pd.to_datetime(df_query['fecha_entrega'].apply(lambda x: x+timedelta(hours=-3) if pd.notna(x) else x), utc=True) 
+    # timezone Chile
+    tz_chile = pytz.timezone('Chile/Continental')
     
+    def convertir_a_tz_chile(x):
+        if pd.notna(x):
+            return x.astimezone(tz_chile).tz_localize(None)
+        else:
+            return x
+    # al recibir las fechas están en UTC, por lo que hay que pasarlas
+    # a timezone chileno (generalmente -03:00)              
+    # df_query['fecha_entrega'] = df_query['fecha_entrega'].apply(convertir_a_tz_chile) 
+    #print(df_query['fecha_despacho_retiro'])
+    #print(df_query['fecha_despacho_retiro'])
     # para poder pasar a excel el DataFrame a futuro sin problemas
     for col in df_query.select_dtypes(include=['datetime64[ns, UTC]']).columns:
-        df_query[col] = df_query[col].apply(lambda x: x.tz_localize(None))
+        df_query[col] = df_query[col].apply(convertir_a_tz_chile)
+    #print(df_query['fecha_despacho_retiro'])
+    
+    if df_query.empty:
+        return df_query
       
     try:
         if not os.path.exists('test'):
@@ -301,7 +318,7 @@ def procesar_query(fecha) -> pd.DataFrame:
                       'QUIEN PROGRAMA', 'DIRECCION', 'COMUNA', 'CONTACTO', 
                       'TELEF. CONTACTO', 'CLIENTE', 'FECHA SOLICITUD DESPACHO', 'FECHA PROG DESPACHO', 
                       'FECHA ENTREGA', 'DATOS CONTACTO RETIRO', 'DATOS TRANSPORTE EXTERNO', 'OBS.CLIENTE', 
-                      'ESTADO DE ENTREGA', 'OBSERVACIONES', 'CONDUCTOR', 'fecha_despacho_retiro']
+                      'ESTADO DE ENTREGA', 'OBSERVACIONES', 'CONDUCTOR', 'FECHA INGRESO', 'fecha_despacho_retiro']
     
     columnas_agrupado = ['nave_nombre', 'contenedor', 'fecha_llegada', 'fecha_desconsolidado', 
                          'n_carpeta', 'estado_pago', 'tipo_de_entrega', 'fk_consolidado',
@@ -309,7 +326,7 @@ def procesar_query(fecha) -> pd.DataFrame:
                          'quien', 'fk_direccion_completa', 'fk_comuna_nombre', 'nombre_contacto', 
                          'telefono_contacto', 'cliente', 'fecha_solicitud', 'fecha_programada',
                          'fecha_entrega', 'retiro', 'emp_ext', 'obs_cliente', 
-                         'estado_entrega', 'observaciones', 'conductor', 'fecha_despacho_retiro']
+                         'estado_entrega', 'observaciones', 'conductor', 'fecha_registro', 'fecha_despacho_retiro']
     
     df_final[columnas_final] = df_agrupado[columnas_agrupado]
     

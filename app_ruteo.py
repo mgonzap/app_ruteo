@@ -60,12 +60,12 @@ class Entregas:
             # 1 vuelta 8 puntos
             "JAC": Camion(16, 6, 2, 5),
             # 1 vuelta 6 ptos
-            "Hyundai": Camion(6, 0, 1, 6),
+            "Hyundai": Camion(6, 0, 2, 6),
             "Externo_1": Camion(17, 16, 1, 7),
             "Externo_2": Camion(17, 16, 1, 7)
         }
         self.cap_max_camion = 0
-        self.df = None
+        self.df_original = None
     
     def ordenar_camiones(self):
         camiones_ordenados = sorted(self.camiones.items(), 
@@ -95,7 +95,7 @@ class Entregas:
     # Se recibe el df procesado en procesar_datos.py
     def cargar_datos(self):
         self.ordenar_camiones()
-        self.df, self.df_separados = separar_entregas(self.df, self.cap_max_camion)
+        self.df, self.df_separados = separar_entregas(self.df_original, self.cap_max_camion)
         #print(self.df["VOLUMEN"])
         self.fecha_filtrado = self.df['FECHA SOLICITUD DESPACHO'].iloc[0]
         #df = df[df["latitudes"] != -33.464161]
@@ -269,7 +269,7 @@ class Entregas:
                     'RUTA', '(m³) TOTAL RUTA', 'ORDEN', 'N° CARPETA', 'EJECUTIVO CUENTA', 'CLIENTE', 
                     'N° CONTENEDOR', 'N° SERVICIO', '(m³)', 'BULTOS', 'FECHAS', 'CAMIÓN',
                     'DIRECCIÓN', 'COMUNA', 'EMPRESA EXT', 'CONTACTO',
-                    'OBSERVACIONES', 'CHOFER', 'ESTADO'
+                    'OBSERVACIONES', 'CHOFER', 'ESTADO', 'FECHA PROGRAMADA', 'ESTADO REVISIÓN'
                 ]
 
                 lista_filas = []
@@ -321,13 +321,15 @@ class Entregas:
                         observaciones = fila_df['OBSERVACIONES'].values[0]
                         chofer = fila_df['CONDUCTOR'].values[0] # TODO: deberia ser en funcion del camion?
                         #estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
-                        estado = 'SIN INFORMACIÓN'
+                        estado = 'S/I'
+                        fecha_prog = fila_df['fecha_despacho_retiro'].values[0]
+                        estado_revision = ''
                         
                         fila: pd.Series = pd.Series([
                                 ruta, vol_ruta, orden, n_carpeta, ejecutivo, cliente, contenedor,
                                 n_servicio, volumen, bultos, fechas_str, camion_str,
                                 direccion, comuna, empresa_ext, contacto,
-                                observaciones, chofer, estado
+                                observaciones, chofer, estado, fecha_prog, estado_revision
                             ],
                             index=cols)
                         lista_filas.append(fila)
@@ -360,14 +362,17 @@ class Entregas:
                     observaciones = fila_df['OBSERVACIONES']
                     chofer = fila_df['CONDUCTOR'] # TODO: deberia ser en funcion del camion?
                     #estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
-                    estado = 'SIN INFORMACIÓN'
+                    estado = 'S/I'
+                    fecha_prog = fila_df['fecha_despacho_retiro']
+                    estado_revision = ''
                     fila: pd.Series = pd.Series([
                             ruta, vol_ruta, orden, n_carpeta, ejecutivo, cliente, contenedor,
                             n_servicio, volumen, bultos, fechas_str, camion_str,
                             direccion, comuna, empresa_ext, contacto,
-                            observaciones, chofer, estado
+                            observaciones, chofer, estado, fecha_prog, estado_revision
                         ],
                         index=cols)
+                    #print(fila)
                     lista_filas.append(fila)
                     ruta += 1
                     

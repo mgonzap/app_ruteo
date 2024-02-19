@@ -1,9 +1,13 @@
-from ventana_principal import VentanaPrincipal
-from ventana_datos import VentanaDatos
+from ventanas_base import Ventana, VentanaDataframe
+from ventana_ruteo import VentanaRuteo
 from ventana_fecha import VentanaFecha
-from PyQt6.QtWidgets import QApplication
+from ventanas_despachos import (
+    VentanaDespachosValidarPago,
+    VentanaDespachosCoordenadas
+)
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QIcon
-from qt_material import apply_stylesheet
+from utils_qt import ConfirmDialog, DataThread
 import sys
 
 # Aqui se crea la aplicacion principal
@@ -12,33 +16,57 @@ import sys
 class MainApp(QApplication):
     def __init__(self):
         super(QApplication, self).__init__(["AppRuteo"])
-        # aplicar tema de libreria qt_material
-        #apply_stylesheet(self, theme='dark_blue.xml', css_file='custom.css')
-        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        Ventana.setIcon(QIcon("logo\\WSC-LOGO2.ico"))
         
-        self.ventana_fecha = VentanaFecha(self.icono)
+        self.icono = QIcon("logo\\WSC-LOGO2.ico")
+        self.ventana_fecha = VentanaFecha()
         self.ventana_fecha.fecha_seleccionada.connect(self.__on_fecha_elegida)
         self.ventana_fecha.show()
         
     def __on_fecha_elegida(self, fecha):
-        self.data_window = VentanaDatos(fecha, self.icono)
-        self.fecha = fecha
-        self.data_window.edicion_terminada.connect(self.__on_edicion_terminada)
-        self.ventana_fecha.hide()
-    
-    def __on_edicion_terminada(self, df):
-        if df.empty:
-            # TODO: popup/ventana que explique que no hay datos 
-            sys.exit()
-        try:
-            df.to_excel('test/geo_test.xlsx', index=False)
-        except PermissionError:
-            print("No se pudo escribir 'test/geo_test.xlsx', permiso denegado.")
-        self.ventana_principal = VentanaPrincipal(df, self.fecha, self.icono)
-        self.ventana_principal.show()
+        VentanaDataframe.setFecha(fecha)
+        # iniciamos worker thread encargado de obtener los datos
+        self.worker_thread = DataThread(fecha)
+        self.worker_thread.setTerminationEnabled(True)
+        self.worker_thread.finished.connect(self.__on_datos_recibidos)
+        self.worker_thread.start()
+        
+        self.confirmar = ConfirmDialog(
+            titulo = "Procesando Datos",
+            texto = "Por favor espere, obteniendo y procesando los datos necesarios...",
+            texto_confirmar = "¿Estás seguro de que quieres cerrar la aplicación?"
+        )
+        self.confirmar.salida_confirmada.connect(sys.exit)
+        
         self.ventana_fecha.close()
+        self.confirmar.exec()
+    
+    def __on_datos_recibidos(self, df):
+        VentanaDataframe.setDataFrame(df)
+        if VentanaDataframe.getDataFrame().empty:
+            msg = QMessageBox(
+                QMessageBox.Icon.Critical,
+                "Error", "No se han encontrado despachos para la fecha indicada. La aplicación se cerrará."
+            )
+            msg.setWindowIcon(Ventana.getIcon())
+            msg.exec()
+            sys.exit()
+        self.ventana_tipo_despacho = VentanaDespachosValidarPago()
+        self.ventana_tipo_despacho.finished.connect(self.__on_despachos_verificados)
+        self.confirmar.close_directly()
+        self.ventana_tipo_despacho.show()
+        return
+    
+    def __on_despachos_verificados(self):
+        self.ventana_coordenadas = VentanaDespachosCoordenadas()
+        self.ventana_coordenadas.finished.connect(self.__on_coordenadas_corregidas)
+        self.ventana_coordenadas.show()
+    
+    def __on_coordenadas_corregidas(self):
+        self.ventana_principal = VentanaRuteo()
+        self.ventana_principal.show()
 
 if __name__ == "__main__":
-    print("Ejecutando main_app")
+    print("Ejecutando aplicación de ruteo...")
     app = MainApp()
     sys.exit(app.exec())

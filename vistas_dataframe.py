@@ -10,7 +10,8 @@ from PyQt6.QtGui import (
     QAction, QPainter, QColor
 )
 from modelos_dataframe import ModeloDataframe, ModeloDataframeCoordenadas
-
+import pandas as pd
+import os
 
 class VistaDataframe(QTableView):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -136,6 +137,25 @@ class VistaDataframeCoordenadas(VistaDataframe):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.idx_col_dir = 1 if not self.buscar_externo else 3
         self.horizontalHeader().setSectionResizeMode(self.idx_col_dir, QHeaderView.ResizeMode.Stretch)
+        self.cargar_cache()
+    
+    # TODO: delegados no se estan reseteando en la vista
+    def cargar_cache(self):
+        if not os.path.exists('cache/coordenadas.xlsx'):
+            return
+        df_cache = pd.read_excel('cache/coordenadas.xlsx')
+        # ir leyendo las filas del modelo
+        print("cargando cache...")
+        self.model().beginResetModel()
+        for model_row in range(self.model().rowCount()):
+            col_name, dir = self.getDireccion(model_row)
+            row_cached = df_cache[df_cache[col_name] == dir]
+            for idx, cache_row in row_cached.iterrows():
+                lat = float(cache_row['LATITUD'])
+                long = float(cache_row['LONGITUD'])
+                self.actualizar_coordenadas(lat, long, model_row)
+                self.setItemDelegateForRow(model_row, self.itemDelegate())
+        self.model().endResetModel()
         
     def enviar_direccion(self):
         self.model_idx_dir = self.model().index(self.selectionModel().currentIndex().row(), self.idx_col_dir)
@@ -148,23 +168,35 @@ class VistaDataframeCoordenadas(VistaDataframe):
             pass
         self.direccion.emit(direccion)
     
-    def actualizar_coordenadas(self, lat, long):
+    def actualizar_coordenadas(self, lat, long, row=-1):
+        if row <= -1:
+            row = self.model_idx_dir.row()
         # latitud y longitud son las ultimas 2 columnas
         column_count = self.model().columnCount()
-        indice_latitud = self.model().index(self.model_idx_dir.row(), column_count - 2)
-        indice_longitud = self.model().index(self.model_idx_dir.row(), column_count - 1)
+        indice_latitud = self.model().index(row, column_count - 2)
+        indice_longitud = self.model().index(row, column_count - 1)
 
         self.model().setData(indice_latitud, lat, Qt.ItemDataRole.EditRole)
         self.model().setData(indice_longitud, long, Qt.ItemDataRole.EditRole)
-        self.setItemDelegateForRow(self.model_idx_dir.row(), self.delegado_coordenadas)
+        self.setItemDelegateForRow(row, self.delegado_coordenadas)
         self.selectionModel().clearSelection()
-        
-    def coordenadas_invalidas(self) -> bool:
+    
+    # TODO: funcion tiene mas sentido en el modelo mismo
+    def getCoords(self, row) -> Tuple[float, float]:
         model = self.model()
         col_count = model.columnCount()
-        for row in range(model.rowCount()):
-            lat = float(model.data(model.index(row, col_count - 2)))
-            long = float(model.data(model.index(row, col_count - 1)))
+        lat = float(model.data(model.index(row, col_count - 2)))
+        long = float(model.data(model.index(row, col_count - 1)))
+        return lat, long
+    
+    def getDireccion(self, row) -> Tuple[str, str]:
+        col_name = self.model().headerData(self.idx_col_dir, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+        dir = self.model().data(self.model().index(row, self.idx_col_dir))
+        return col_name, dir
+        
+    def coordenadas_invalidas(self) -> bool:
+        for row in range(self.model().rowCount()):
+            lat, long = self.getCoords(row)
             if (lat == 0.0) or (long == 0.0) or (int(lat) != -33) or (int(long) != -70):
                 return True
         return False

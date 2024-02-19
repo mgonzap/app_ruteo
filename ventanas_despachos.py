@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QLabel
 )
 from functools import partial
+import pandas as pd
+import os
 
 class VentanaDespachos(VentanaDataframeEliminacion):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -60,7 +62,7 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(
             parent, "Corregir coordenadas de despacho", 
-            safe_to_close=True
+            safe_to_close=False
         )
 
         self.central_widget = QWidget(self)
@@ -115,11 +117,12 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
     def resizeToContents(self, move_to_center: bool = False):
         if self.view == None:
             return
+        content_height = self.view.getContentHeight()
         ext_height = 0
         if self.view_ext != None:
             ext_height = self.view_ext.getContentHeight()
         screen_size = QGuiApplication.primaryScreen().availableSize()
-        content_height = self._view.getContentHeight() + ext_height
+        content_height +=  ext_height
         height = max(
             350,
             min(screen_size.height(), content_height)
@@ -142,7 +145,45 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
             if confirmar == QMessageBox.StandardButton.No:
                 return
         self.finished.emit()
+        self.guardar_cache_coordenadas()
         self.forceClose()
+    
+    # TODO: esta es una implementacion rapida, logica pertenece mas al modelo
+    def guardar_cache_coordenadas(self):
+        if not os.path.exists('cache'):
+            os.makedirs('cache')
+        cache_list = []
+        for row in range(self.view.model().rowCount()):
+            lat, long = self.view.getCoords(row)
+            # solo guardamos coordenadas validas
+            if lat != 0.0 and long != 0.0:
+                col_name, dir = self.view.getDireccion(row)
+                cache_row = {
+                    'DIRECCION': dir if col_name=='DIRECCION' else '',
+                    'DATOS TRANSPORTE EXTERNO': dir if col_name=='DATOS TRANSPORTE EXTERNO' else '',
+                    'LATITUD': lat,
+                    'LONGITUD': long
+                }
+                cache_list.append(cache_row)
+        for row in range(self.view_ext.model().rowCount()):
+            lat, long = self.view_ext.getCoords(row)
+            # solo guardamos coordenadas validas
+            if lat != 0.0 and long != 0.0:
+                col_name, dir = self.view_ext.getDireccion(row)
+                cache_row = {
+                    'DIRECCION': dir if col_name=='DIRECCION' else '',
+                    'DATOS TRANSPORTE EXTERNO': dir if col_name=='DATOS TRANSPORTE EXTERNO' else '',
+                    'LATITUD': lat,
+                    'LONGITUD': long
+                }
+                cache_list.append(cache_row)
+        if len(cache_list) <= 0:
+            return
+        df_cache = pd.DataFrame(cache_list)
+        if os.path.exists('cache/coordenadas.xlsx'):
+            df_cache_antiguo = pd.read_excel('cache/coordenadas.xlsx')
+            df_cache = pd.concat([df_cache_antiguo, df_cache])
+        df_cache.to_excel('cache/coordenadas.xlsx', index=False)
     
     # reemplazamos la funcion show para que revise si hay datos que necesiten corrección
     # si no, simplemente se considera la edición finalizada.
@@ -151,6 +192,6 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
                 or (self.view.model().rowCount() == 0 and self.view_ext.model().rowCount() == 0):
             self.finalizar_edicion()
         else:
-            super().show()
+            super(Ventana, self).show()
             
 

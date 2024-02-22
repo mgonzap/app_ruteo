@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date
 from base_datos import *
 import georef
 import pytz
@@ -52,8 +52,8 @@ def obtener_dataframe(fecha: str):
     
     # Procesamos los datos mediante georef
     # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
-    df = georef.pasar_a_coordenadas(df, test_prints=False)
     df.reset_index(drop=True, inplace=True)
+    df = georef.pasar_a_coordenadas(df)
     return df
   
 def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
@@ -92,7 +92,6 @@ def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
 
 def agrupar_entregas(df: pd.DataFrame):
     # TODO: ahora agruparemos por DIRECCIÓN y CLIENTE, concatenamos todo lo q no sea BULTOS VOLUMEN PESO
-    # TODO: algunas cosas deberían tener prioridad, por ejemplo 'REVISAR DESPACHO GRATUITO NO INCLUIDO' en tipo de entrega
 
     # La entrega que tenga N° CARPETA != None es la 'principal'.
     # Las demas deberian coincidir en direccion, comuna, cliente
@@ -123,11 +122,13 @@ def agrupar_entregas(df: pd.DataFrame):
         # si se encuentran elementos así, se suma 'N° BULTOS', 'PESO' y 'VOLUMEN'
         # similares no debería ser empty nunca, puesto que siempre estará el elemento mismo
         # para evitar duplicados:
-        # TODO: quizas hacer cat y luego split es innecesario
+        # TODO: quizas hacer cat y split es innecesario
         lista_carpetas = ','.join(list(set(similares['N° CARPETA'].str.cat(sep=',').split(','))))
+        lista_ejecutivos = ','.join(list(set(similares['EJECUTIVO'].str.cat(sep=',').split(','))))
         lista_servicios = ','.join(list(set(similares['SERVICIO'].str.cat(sep=',').split(','))))
         
         fila['N° CARPETA'] = lista_carpetas
+        fila['EJECUTIVO'] = lista_ejecutivos
         fila['SERVICIO'] = lista_servicios
         fila['N° BULTOS'] = similares['N° BULTOS'].sum()
         fila['VOLUMEN'] = similares['VOLUMEN'].sum()
@@ -160,11 +161,7 @@ def procesar_query(fecha) -> pd.DataFrame:
         else:
             return x
     # al recibir las fechas están en UTC, por lo que hay que pasarlas
-    # a timezone chileno (generalmente -03:00)              
-    # df_query['fecha_entrega'] = df_query['fecha_entrega'].apply(convertir_a_tz_chile) 
-    #print(df_query['fecha_despacho_retiro'])
-    #print(df_query['fecha_despacho_retiro'])
-    # para poder pasar a excel el DataFrame a futuro sin problemas
+    # a timezone chileno (generalmente -03:00) para convertir df a excel    
     for col in df_query.select_dtypes(include=['datetime64[ns, UTC]']).columns:
         df_query[col] = df_query[col].apply(convertir_a_tz_chile)
     #print(df_query['fecha_despacho_retiro'])
@@ -173,9 +170,10 @@ def procesar_query(fecha) -> pd.DataFrame:
         return df_query
       
     try:
-        if not os.path.exists('test'):
-            os.makedirs('test')
-        df_query.to_excel('test/excel_query.xlsx', index=False)
+        query_excel_path = 'test/excel_query.xlsx'
+        if not os.path.exists(query_excel_path):
+            os.makedirs(query_excel_path)
+        df_query.to_excel(query_excel_path, index=False)
     except PermissionError:
         print("No se pudo acceder a test/excel_query.xlsx, permiso denegado.")
 
@@ -248,7 +246,8 @@ def procesar_query(fecha) -> pd.DataFrame:
       else 'RETIRA CLIENTE' if pd.notna(fila['fk_bodega']) # != null
       else 'SIN ESPECIFICAR' if pd.isna(fila['fk_region']) # == null
       else 'DESPACHO GRATIS INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] not in comunas_no_incluidas_stgo) # == 12
-      else 'REVISAR DESPACHO GRATUITO NO INCLUIDO'
+      else 'REVISAR DESPACHO GRATUITO NO INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] in comunas_no_incluidas_stgo)
+      else 'SIN ESPECIFICAR'
     , axis=1)
     
     # 'QUIEN PROGRAMA'

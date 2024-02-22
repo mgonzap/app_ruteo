@@ -137,9 +137,8 @@ class VistaDataframeCoordenadas(VistaDataframe):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.idx_col_dir = 1 if not self.buscar_externo else 3
         self.horizontalHeader().setSectionResizeMode(self.idx_col_dir, QHeaderView.ResizeMode.Stretch)
-        self.cargar_cache()
+        #self.cargar_cache()
     
-    # TODO: delegados no se estan reseteando en la vista
     def cargar_cache(self):
         if not os.path.exists('cache/coordenadas.xlsx'):
             return

@@ -183,6 +183,11 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
         if os.path.exists('cache/coordenadas.xlsx'):
             df_cache_antiguo = pd.read_excel('cache/coordenadas.xlsx')
             df_cache = pd.concat([df_cache_antiguo, df_cache])
+            df_cache = df_cache.drop_duplicates(
+                ['DIRECCION', 'DATOS TRANSPORTE EXTERNO'], 
+                keep='last', 
+                ignore_index=True
+            )
         df_cache.to_excel('cache/coordenadas.xlsx', index=False)
     
     # reemplazamos la funcion show para que revise si hay datos que necesiten corrección

@@ -103,7 +103,7 @@ class VentanaRuteo(VentanaDataframe):
         for nombre in self.camiones_seleccionados:
             camiones_ruteo[nombre] = self.dict_camiones[nombre]
         self.entregas.camiones = camiones_ruteo
-        self.worker_thread = RoutesThread(self.getDataFrame(), self.entregas, self.camiones_seleccionados)
+        self.worker_thread = RoutesThread(self.getDataFrame(), self.entregas)
         self.worker_thread.setTerminationEnabled(True)
         self.worker_thread.finished.connect(self.__on_finished)
         self.worker_thread.start()
@@ -233,11 +233,11 @@ class ConfirmDialog(QDialog):
 class RoutesThread(QThread):
     finished = pyqtSignal()
     
-    def __init__(self, df, entregas, camiones):
+    def __init__(self, df, entregas):
         super().__init__()
         self.entregas: Entregas = entregas
+        print(self.entregas.camiones)
         self.entregas.df_original = df
-        self.camiones = camiones
 
     def run(self):
         self.entregas.ejecutar_modelo()

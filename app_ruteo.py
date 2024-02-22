@@ -9,7 +9,6 @@ from georef import *
 import numpy as np
 import folium
 import xlsxwriter
-import openpyxl
 import os
 import webbrowser
 import pandas as pd
@@ -41,8 +40,8 @@ class Camion:
     def __init__(self, capacidad, sub_capacidad, vueltas, maximo_entregas):
         self.capacidad = capacidad
         self.sub_capacidad = sub_capacidad
-        self.vueltas = vueltas
-        self.maximo_entregas = maximo_entregas
+        self.vueltas: int = vueltas
+        self.maximo_entregas: int = maximo_entregas
     
     def __str__(self):
         return f"({self.capacidad}, {self.sub_capacidad}, {self.vueltas}, {self.maximo_entregas})"
@@ -65,7 +64,7 @@ class Entregas:
             "Externo_2": Camion(17, 16, 1, 7)
         }
         self.cap_max_camion = 0
-        self.df_original = None
+        self.df_original: pd.DataFrame | None = None
     
     def ordenar_camiones(self):
         camiones_ordenados = sorted(self.camiones.items(), 
@@ -95,10 +94,8 @@ class Entregas:
     # Se recibe el df procesado en procesar_datos.py
     def cargar_datos(self):
         self.ordenar_camiones()
-        self.df, self.df_separados = separar_entregas(self.df_original, self.cap_max_camion)
-        #print(self.df["VOLUMEN"])
+        self.df, self.df_separados = separar_entregas(self.df_original.copy(), self.cap_max_camion)
         self.fecha_filtrado = self.df['FECHA SOLICITUD DESPACHO'].iloc[0]
-        #df = df[df["latitudes"] != -33.464161]
         latitudes = self.df["LATITUD"]
         longitudes = self.df["LONGITUD"]
 
@@ -287,8 +284,7 @@ class Entregas:
                         # obtenemos la fila correspondiente de nuestro df
                         fila_df = self.df[[servicios.startswith(str(int(point[3]))) 
                                                     for servicios in self.df['SERVICIO']]]
-                        #print(point[3])
-                        #print(fila_df)
+
                         # asignamos valores
                         ruta = k + 1
                         vol_ruta = cluster_sum.round(2)
@@ -318,7 +314,9 @@ class Entregas:
                         comuna = fila_df['COMUNA'].values[0]
                         empresa_ext = fila_df['DATOS TRANSPORTE EXTERNO'].values[0]
                         contacto = fila_df['TELEF. CONTACTO'].values[0]
-                        observaciones = fila_df['OBSERVACIONES'].values[0]
+                        obs_cliente = fila_df['OBS.CLIENTE'].values[0] if fila_df['OBS.CLIENTE'].values[0] != None else ''
+                        obs = fila_df['OBSERVACIONES'].values[0] if fila_df['OBSERVACIONES'].values[0] != None else ''
+                        observaciones = ", ".join([obs_cliente, obs])
                         chofer = fila_df['CONDUCTOR'].values[0] # TODO: deberia ser en funcion del camion?
                         #estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
                         estado = 'S/I'
@@ -337,6 +335,8 @@ class Entregas:
                 # incluimos las rutas separadas!
                 ruta += 1
                 # TODO: cambiar a otra cosa, iterrows es super lento
+                print("-------DF SEPARADO-------")
+                print(self.df_separados[['SERVICIO', 'N° BULTOS', 'VOLUMEN']])
                 for idx, fila_df in self.df_separados.iterrows():
                     # asignamos valores (notar que algunos difieren del df normal)
                     vol_ruta = np.float64(fila_df['VOLUMEN']).round(2)
@@ -359,7 +359,9 @@ class Entregas:
                     comuna = fila_df['COMUNA']
                     empresa_ext = fila_df['DATOS TRANSPORTE EXTERNO']
                     contacto = fila_df['TELEF. CONTACTO']
-                    observaciones = fila_df['OBSERVACIONES']
+                    obs_cliente = fila_df['OBS.CLIENTE'] if fila_df['OBS.CLIENTE'] != None else ''
+                    obs = fila_df['OBSERVACIONES'] if fila_df['OBSERVACIONES'] != None else ''
+                    observaciones = ", ".join([obs_cliente, obs])
                     chofer = fila_df['CONDUCTOR'] # TODO: deberia ser en funcion del camion?
                     #estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
                     estado = 'S/I'

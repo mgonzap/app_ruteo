@@ -2,7 +2,7 @@ from ventanas_base import Ventana, VentanaDataframe
 from ventana_ruteo import VentanaRuteo
 from ventana_fecha import VentanaFecha
 from ventanas_despachos import (
-    VentanaDespachosValidarPago,
+    VentanaDespachosVerificacion,
     VentanaDespachosCoordenadas
 )
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -51,7 +51,7 @@ class MainApp(QApplication):
             msg.setWindowIcon(Ventana.getIcon())
             msg.exec()
             sys.exit()
-        self.ventana_tipo_despacho = VentanaDespachosValidarPago()
+        self.ventana_tipo_despacho = VentanaDespachosVerificacion()
         self.ventana_tipo_despacho.finished.connect(self.__on_despachos_verificados)
         self.confirmar.close_directly()
         self.ventana_tipo_despacho.show()

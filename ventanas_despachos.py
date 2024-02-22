@@ -33,7 +33,7 @@ class VentanaDespachos(VentanaDataframeEliminacion):
         self.resizeToContents(move_to_center=True)
     
 
-class VentanaDespachosValidarPago(VentanaDataframeEliminacion):
+class VentanaDespachosVerificacion(VentanaDataframeEliminacion):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(
             parent, "Verificar despachos no gratuitos", 
@@ -49,7 +49,7 @@ class VentanaDespachosValidarPago(VentanaDataframeEliminacion):
             "También es posible eliminar despachos no pagados con clic derecho.")
         self.layout.addWidget(self.label_nombre)
         
-        self.proxy_model = ModeloDataframePagoDespacho()
+        self.proxy_model = ModeloDataframeVerificacion()
         self.view = VistaDataframePagoDespacho(self)
         self.layout.addWidget(self.view)
             

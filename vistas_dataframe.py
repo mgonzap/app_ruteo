@@ -85,6 +85,7 @@ class VistaDataframeEliminacion(VistaDataframe):
                 self.setItemDelegateForRow(row, self.delegado_eliminacion)
         else:
             model.removeFromRowRemoveList(row)
+            self.setItemDelegateForRow(row, self.itemDelegate())
         self.selectionModel().clearSelection()
 
 

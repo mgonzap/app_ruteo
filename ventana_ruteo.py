@@ -30,7 +30,7 @@ class VentanaRuteo(VentanaDataframe):
             title="Modelo de Optimización de rutas WScargo",
             safe_to_close=False,
         )
-        self.setGeometry(100, 100, 550, 400)
+        self.setGeometry(100, 100, 550, 550)
 
         self.setCentralWidget(QWidget(self))
         self.centralWidget().setContentsMargins(10, 5, 10, 5)
@@ -85,10 +85,13 @@ class VentanaRuteo(VentanaDataframe):
 
             self.addSeparator()
 
-            self.stretch = QWidget()
+            self.stretch = QLabel()
+            self.stretch.setTextFormat(Qt.TextFormat.MarkdownText)
+            self.stretch.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.stretch.setSizePolicy(
                 QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Ignored
             )
+            self.actualizar_vol_total()
             self.addWidget(self.stretch)
 
             # VentanaDataframe.getFecha()
@@ -106,6 +109,12 @@ class VentanaRuteo(VentanaDataframe):
             self.ventana_despachos = VentanaDespachos()
             # self.ventana_despachos.finished.connect(self.actualizar_label_vol_total_despachos)
             self.ventana_despachos.show()
+            
+        def actualizar_vol_total(self):
+            vol_total = np.float64(VentanaDataframe.getDataFrame()['VOLUMEN'].sum()).round(2)
+            self.stretch.setText(
+                f"*Volumen total de despachos: {vol_total}*"
+            )
 
     class RuteoLeftLayout(QVBoxLayout):
         def __init__(self):
@@ -126,6 +135,7 @@ class VentanaRuteo(VentanaDataframe):
 
             self.lista_camiones = CamionListWidget()
             self.v_layout.addWidget(self.lista_camiones)
+            
             self.addLayout(self.v_layout)
 
         def abrir_ventana_creacion(self):
@@ -137,6 +147,7 @@ class VentanaRuteo(VentanaDataframe):
             camion_creado = Camion(capacidad, 0, vueltas, entregas)
             self.lista_camiones.addCamion(nombre, camion_creado)
             self.ventana_creacion.close()
+            
 
     class RuteoRightLayout(QVBoxLayout):
         def __init__(self):
@@ -156,6 +167,15 @@ class VentanaRuteo(VentanaDataframe):
             self.lista_camiones = CamionListWidget(ruteo=True)
             for nombre, camion in self.entregas.camiones.items():
                 self.lista_camiones.addCamion(nombre, camion, ruteo=True)
+                
+            self.lista_camiones.camion_enviado.connect(self.actualizar_volumen_ruta)
+            self.lista_camiones.cambio.connect(self.actualizar_volumen_ruta)
+                
+            self.volumen_ruta = QLabel()
+            self.volumen_ruta.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.volumen_ruta.setTextFormat(Qt.TextFormat.MarkdownText)
+            self.actualizar_volumen_ruta()
+            self.v_layout.addWidget(self.volumen_ruta)
 
             self.v_layout.addWidget(self.lista_camiones)
             self.addLayout(self.v_layout)
@@ -199,6 +219,15 @@ class VentanaRuteo(VentanaDataframe):
 
         def __on_finished(self):
             self.calc_dlg.close_directly()
+            
+        def actualizar_volumen_ruta(self, nombre="", truck=None):
+            vol_total = 0
+            dict_camiones = self.lista_camiones.toDict()
+            for camion in dict_camiones:
+                vol_total += dict_camiones[camion].capacidad * dict_camiones[camion].vueltas
+            self.volumen_ruta.setText(
+                f"*Volumen teórico de ruteo: {vol_total}*"
+            )
 
 
 class ConfirmDialog(QDialog):

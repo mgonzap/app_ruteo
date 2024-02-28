@@ -49,9 +49,10 @@ def pasar_a_coordenadas(df_filtrado):
     # estos strings vienen la mayoría en formato 'NOMBRE_EXTERNO | DIRECCION', sin embargo
     # existe una excepción que es TVP.
     df_geo = df_filtrado[(df_filtrado['LATITUD'] == 0.0) | (df_filtrado['LONGITUD'] == 0.0)]
+    print("rows a georef:", df_geo.shape[0])
     
     dict_dir = None
-    cache_rows = []
+    new_cache_rows = []
     cache_cols = ['DIRECCION', 'DATOS TRANSPORTE EXTERNO', 'LATITUD', 'LONGITUD']
     for direccion, datos_externo in zip(df_geo["DIRECCION"], df_geo["DATOS TRANSPORTE EXTERNO"]):
         dir_string = direccion
@@ -80,7 +81,7 @@ def pasar_a_coordenadas(df_filtrado):
             longitudes.append(longitud)
             
             dir_row = [dir_string, ext_string, latitud, longitud]
-            cache_rows.append(dir_row)
+            new_cache_rows.append(dir_row)
             
         else:
             # Idea sería cambiar por S/I pero da error con app_ruteo.ejecutar_modelo(), pues necesita floats
@@ -93,8 +94,12 @@ def pasar_a_coordenadas(df_filtrado):
     df_geo.loc[:, "LATITUD"] = latitudes
     df_geo.loc[:, "LONGITUD"] = longitudes
     
+    # cargamos al df original coordenadas obtenidas en georef
+    for idx_geo in df_geo.index:
+        df_filtrado.loc[idx_geo, ["LATITUD", "LONGITUD"]] = df_geo.loc[idx_geo, ["LATITUD", "LONGITUD"]]
+    
     # Guardamos el cache como un archivo excel
-    df_cache = pd.DataFrame(data=cache_rows, columns=cache_cols)
+    df_cache = pd.DataFrame(data=new_cache_rows, columns=cache_cols)
     if os.path.exists(cache_path):
         df_cache_antiguo = pd.read_excel(cache_path)
         if df_cache.empty:
@@ -134,6 +139,7 @@ def cargar_cache(df: pd.DataFrame, cache_path: str) -> pd.DataFrame:
         os.makedirs(cache_path)
         return df
     
+    print("df rows:", df.shape[0])
     df_cached = pd.read_excel(cache_path)
     # TODO: iterrows es lento, cuando despachos escalen se debe cambiar a algo mas eficiente
     # quizas itertuples
@@ -148,5 +154,4 @@ def cargar_cache(df: pd.DataFrame, cache_path: str) -> pd.DataFrame:
             df.loc[idx_temp, ['LATITUD', 'LONGITUD']] = df_cached.loc[idx, ['LATITUD', 'LONGITUD']]
             cache_hits += 1
     print("cache hits:", cache_hits)
-    print("df rows:", df.shape[0])
     return df

@@ -153,7 +153,7 @@ class VentanaRuteo(VentanaDataframe):
             )
             self.v_layout.addWidget(self.label)
 
-            self.lista_camiones = CamionListWidget()
+            self.lista_camiones = CamionListWidget(ruteo=True)
             for nombre, camion in self.entregas.camiones.items():
                 self.lista_camiones.addCamion(nombre, camion, ruteo=True)
 

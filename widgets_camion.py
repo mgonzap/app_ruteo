@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QSizePolicy,
-    QScrollArea
+    QScrollArea,
+    QMessageBox,
 )
 from PyQt6.QtGui import QIcon
 from app_ruteo import Camion
@@ -124,7 +125,6 @@ class CamionWidget(QFrame):
         return button
 
     def __on_enviar_camion__(self):
-        print(f"enviar {self.nombre}: {self.camion}")
         self.camion_enviado.emit(self.nombre, self.camion)
 
     def __on_editar_camion__(self):
@@ -252,16 +252,18 @@ class CamionListWidget(QScrollArea):
             self.vbox_layout.addWidget(camion_widget)
     
     def sendCamion(self, nombre, camion):
-        if self.ruteo:
-            # Si es el ultimo camion, qmessagebox con warning y no emitir
-            pass
-        
-        self.camion_enviado.emit(nombre, camion)
         for widget in self.widgets_camiones:
             if (widget.nombre == nombre):
+                if self.ruteo and len(self.widgets_camiones) <= 1:
+                    # Si es el ultimo camion, qmessagebox con warning y no emitir
+                    QMessageBox.warning(
+                        self, "Aviso",
+                        "Debe quedar por lo menos un camión en el ruteo."
+                    )
+                    return
+                self.camion_enviado.emit(nombre, camion)
                 self.vbox_layout.removeWidget(widget)
                 self.widgets_camiones.remove(widget)
-        pass
     
     def toDict(self):
         dict_camiones = {}

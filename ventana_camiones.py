@@ -1,13 +1,14 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QDialog, QSpinBox
 )
+from ventanas_base import Ventana
 from PyQt6.QtCore import pyqtSignal
 from PyQt6 import QtGui
 from app_ruteo import Camion
 
-class VentanaCamion(QMainWindow):
+class VentanaCamion(Ventana):
     resultado_camion = pyqtSignal(str, int, int, int)
-    def __init__(self, parent, camion_a_editar: tuple[str, Camion] | None = None):
+    def __init__(self, parent = None, camion_a_editar: tuple[str, Camion] | None = None):
         super().__init__(parent)
         
         self.setWindowIcon(QtGui.QIcon("logo\\WSC-LOGO2.ico"))

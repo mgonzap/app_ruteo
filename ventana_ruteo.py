@@ -1,201 +1,209 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QComboBox, QListWidget, QListWidgetItem, QDialog,
-    QMessageBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QDialog,
+    QMessageBox,
+    QApplication,
+    QToolBar,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QIcon, QAction
 from app_ruteo import Entregas, Camion
 from ventanas_base import VentanaDataframe
 from ventana_camiones import VentanaCamion
 from ventanas_despachos import VentanaDespachos
 from copy import deepcopy
+from functools import partial
+from widgets_camion import CamionListWidget
+import sys
+import numpy as np
 
 
 class VentanaRuteo(VentanaDataframe):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(
-            parent= parent, title= "Modelo de Optimización de rutas WScargo",
-            safe_to_close= False
+            parent=parent,
+            title="Modelo de Optimización de rutas WScargo",
+            safe_to_close=False,
         )
-        self.worker_thread = None
-        self.entregas = Entregas()
-
-        self.camiones_seleccionados = list(self.entregas.camiones.keys())
-        self.dict_camiones = deepcopy(self.entregas.camiones)
-
-        self.setGeometry(100, 100, 700, 400)
+        self.setGeometry(100, 100, 550, 400)
 
         self.setCentralWidget(QWidget(self))
         self.centralWidget().setContentsMargins(10, 5, 10, 5)
 
-        # Layout Base
-        self.layout = QHBoxLayout(self.centralWidget())
-        
-        ## Layout para ComboBox y sus botones (izquierda de la pantalla)
-        self.v_combo_layout = QVBoxLayout()
-        self.v_combo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        ### Logo
-        self.logo_label = QLabel()
-        self.logo_label.setPixmap(QPixmap("logo\\WSC-LOGO.png"))
-        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.v_combo_layout.addWidget(self.logo_label)
-        
-        ### Spacing 
-        self.v_combo_layout.addSpacing(30)
-        
-        ### Fecha
-        self.fecha_line_edit = QLabel(f"Se calcularán rutas para: {self.getFecha()}", self)
-        self.fecha_line_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.v_combo_layout.addWidget(self.fecha_line_edit)
-        
-        ### Boton para ver Despachos
-        self.v_combo_layout.addWidget(self.createQPushButton("Ver lista de despachos", self.ver_ventana_despachos))
-        
-        self.v_combo_layout.addSpacing(30)
+        self.addToolBar(self.RuteoToolbar())
 
-        ### ComboBox reflejara los camiones que esten almacenados en el objeto Entregas
-        self.combo_camiones = QComboBox()
-        self.combo_camiones.addItems(self.entregas.camiones.keys())
-        self.v_combo_layout.addWidget(self.combo_camiones)
+        self.main_layout = QHBoxLayout(self.centralWidget())
 
-        ### Boton Agregar Camion
-        self.v_combo_layout.addWidget(self.createQPushButton("Agregar Camión a Ruteo", self.agregar_camion))
-        ### Boton Quitar Camion
-        self.v_combo_layout.addWidget(self.createQPushButton("Quitar Camión de Ruteo", self.quitar_camion))
-        ### Boton Editar Camion
-        self.v_combo_layout.addWidget(self.createQPushButton("Editar Camión", self.abrir_ventana_edicion))
-        ### Boton Crear Camion
-        self.v_combo_layout.addWidget(self.createQPushButton("Crear Nuevo Camión", self.abrir_ventana_creacion))
-        
-        self.layout.addLayout(self.v_combo_layout, 35)
-        
-        # Spacer
-        self.layout.addSpacing(20)
-        
-        # Layout para la lista de camiones y el calculo de resultados
-        self.v_list_layout = QVBoxLayout()
-        self.v_list_layout.addWidget(QLabel("Camiones considerados para el cálculo de rutas:"))
-        # La lista de camiones reflejara los camiones considerados para el cálculo
-        self.lista_camiones = QListWidget(self)
-        self.v_list_layout.addWidget(self.lista_camiones)
-        # Populamos la lista
-        for camion in self.camiones_seleccionados:
-            nuevo_item = QListWidgetItem(camion)
-            nuevo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.lista_camiones.addItem(nuevo_item)
-            
-        self.v_list_layout.addWidget(self.createQPushButton("Calcular Vueltas y Servicios", self.ejecutar_modelo))
-        
-        self.layout.addLayout(self.v_list_layout, 65)
+        self.left_layout = self.RuteoLeftLayout()
+        self.right_layout = self.RuteoRightLayout()
 
-    def ejecutar_modelo(self):
-        if len(self.camiones_seleccionados) == 0:
-            self.generar_advertencia("Es necesario por lo menos un camión para calcular rutas.")
-            return
-        
-        if self.worker_thread != None and self.worker_thread.isRunning():
-            self.generar_advertencia("Ya se están calculando rutas. Se debe esperar a que termine el proceso.")
-            return
-        
-        camiones_ruteo = {}
-        for nombre in self.camiones_seleccionados:
-            camiones_ruteo[nombre] = self.dict_camiones[nombre]
-        self.entregas.camiones = camiones_ruteo
-        self.worker_thread = RoutesThread(self.getDataFrame(), self.entregas, self.camiones_seleccionados)
-        self.worker_thread.setTerminationEnabled(True)
-        self.worker_thread.finished.connect(self.__on_finished)
-        self.worker_thread.start()
-        self.calc_dlg = ConfirmDialog(self)
-        self.calc_dlg.salida_confirmada.connect(self.__on_model_cancel)
-        self.calc_dlg.exec()
-    
-    def ver_ventana_despachos(self):
-        self.ventana_despachos = VentanaDespachos(self)
-        self.ventana_despachos.show()
-    
-    def __on_model_cancel(self):
-        self.worker_thread.terminate()
-        self.calc_dlg.close_directly()
+        self.left_layout.lista_camiones.camion_enviado.connect(
+            partial(self.right_layout.lista_camiones.addCamion, ruteo=True)
+        )
+        self.right_layout.lista_camiones.camion_enviado.connect(
+            self.left_layout.lista_camiones.addCamion
+        )
+        self.main_layout.addLayout(self.left_layout, 40)
+        self.main_layout.setSpacing(20)
+        self.main_layout.addLayout(self.right_layout, 60)
 
-    def abrir_ventana_creacion(self):
-        self.ventana_camion = VentanaCamion(self)
-        self.ventana_camion.resultado_camion.connect(self.__on_crear_camion)
-        self.ventana_camion.show()
+    class RuteoToolbar(QToolBar):
+        calendar_icon = QIcon("icons\\calendar-event.svg")
+        box_icon = QIcon("icons\\box-seam.svg")
 
-    def __on_crear_camion(self, nombre, capacidad, vueltas, max_entregas):
-        nombres_existentes = [key.upper() for key in self.dict_camiones.keys()]
-        if nombre.upper() not in nombres_existentes:
-            nuevo_camion = Camion(capacidad, 0, vueltas, max_entregas)
-            self.dict_camiones[nombre] = nuevo_camion
-            self.actualizar_combo_camiones()
-            self.ventana_camion.resultado_camion.disconnect()
-            self.ventana_camion.close()
-        else:
-            self.generar_advertencia("Se está creando un camión ya existente. Utilice otro nombre.")
-    
-    def abrir_ventana_edicion(self):
-        camion_seleccionado = self.combo_camiones.currentText()
-        if camion_seleccionado == None or camion_seleccionado == '':
-            self.generar_advertencia("Seleccione un camión de la lista.")
-            return
-        else:
-            self.ventana_camion = VentanaCamion(self, (camion_seleccionado, self.dict_camiones[camion_seleccionado]))
-            self.ventana_camion.resultado_camion.connect(self.__on_editar_camion)
-            self.ventana_camion.show()
- 
-    def __on_editar_camion(self, nombre, capacidad, vueltas, max_entregas):
-        camion_editado = Camion(capacidad, 0, vueltas, max_entregas)
-        self.dict_camiones[nombre] = camion_editado
-        self.ventana_camion.resultado_camion.disconnect()
-        self.ventana_camion.close()
-    
-    def agregar_camion(self):
-        camion_seleccionado = self.combo_camiones.currentText()
-        if camion_seleccionado not in self.camiones_seleccionados:
-            self.camiones_seleccionados.append(camion_seleccionado)
-            self.entregas.camiones[camion_seleccionado] = self.dict_camiones[camion_seleccionado]
-            nuevo_item = QListWidgetItem(camion_seleccionado)
-            nuevo_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.lista_camiones.addItem(nuevo_item)
+        toolbar_stylesheet = """
+            QToolBar {
+                background-color: rgb(220, 220, 220);
+            }
+            QToolBar::separator {
+                background-color: rgb(120, 120, 120);
+                width: 1px;
+                margin-right: 5px;
+                margin-left: 5px;
+            }
+        """
 
-        else:
-            self.generar_advertencia("Camión seleccionado ya se encuentra en la lista.")
+        def __init__(self):
+            super().__init__("Barra de Herramientas")
+            self.setMovable(False)
+            self.toggleViewAction().setEnabled(False)
+            self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            self.setStyleSheet(self.toolbar_stylesheet)
 
-    def quitar_camion(self):
-        camion_a_eliminar = self.lista_camiones.currentItem()
-        # Llamar error si no hay camion seleccionado
-        if camion_a_eliminar is None:
-            self.generar_advertencia("Seleccione un camión para eliminar.")
-            return
-        camion_a_eliminar = camion_a_eliminar.text()
-        if camion_a_eliminar in self.entregas.camiones:
-            # Aquí se elimina el camión de la 'db', no es lo ideal
-            del self.entregas.camiones[camion_a_eliminar]
-            self.actualizar_combo_camiones()
-            self.quitar_camion_lista()
+            self.logo_label = QLabel()
+            self.logo_label.setContentsMargins(2, 2, 5, 2)
+            self.logo_label.setPixmap(QPixmap("logo\\WSC-LOGO.png"))
+            self.logo_label.setAlignment(
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+            )
+            self.addWidget(self.logo_label)
 
-    def actualizar_combo_camiones(self):
-        camiones_disponibles = list(self.dict_camiones.keys())
-        self.combo_camiones.clear()
-        self.combo_camiones.addItems(camiones_disponibles)
+            self.addSeparator()
 
-    def quitar_camion_lista(self):
-        camion_a_quitar = self.lista_camiones.currentItem().text()
-        self.camiones_seleccionados.remove(camion_a_quitar)
-        self.lista_camiones.takeItem(self.lista_camiones.currentRow())
-    
-    def generar_advertencia(self, texto: str) -> None:
-        QMessageBox.warning(self, 'Error', texto)
-        
-    def __on_finished(self):
-        self.calc_dlg.close_directly()
+            self.stretch = QWidget()
+            self.stretch.setSizePolicy(
+                QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Ignored
+            )
+            self.addWidget(self.stretch)
+
+            # VentanaDataframe.getFecha()
+            self.fecha_action = QAction(
+                self.calendar_icon, VentanaDataframe.getFecha(), self
+            )
+            self.fecha_action.setEnabled(False)
+            self.despachos_action = QAction(self.box_icon, "Ver Despachos", self)
+            self.despachos_action.triggered.connect(self.ver_ventana_despachos)
+
+            self.addAction(self.despachos_action)
+            self.addAction(self.fecha_action)
+
+        def ver_ventana_despachos(self):
+            self.ventana_despachos = VentanaDespachos()
+            # self.ventana_despachos.finished.connect(self.actualizar_label_vol_total_despachos)
+            self.ventana_despachos.show()
+
+    class RuteoLeftLayout(QVBoxLayout):
+        def __init__(self):
+            super().__init__()
+            self.crear_boton = QPushButton("Crear Camión")
+            self.crear_boton.clicked.connect(self.abrir_ventana_creacion)
+            self.addWidget(self.crear_boton)
+
+            self.v_layout = QVBoxLayout()
+            self.v_layout.setSpacing(10)
+
+            self.label = QLabel("### Camiones disponibles")
+            self.label.setTextFormat(Qt.TextFormat.MarkdownText)
+            self.label.setAlignment(
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
+            )
+            self.v_layout.addWidget(self.label)
+
+            self.lista_camiones = CamionListWidget()
+            self.v_layout.addWidget(self.lista_camiones)
+            self.addLayout(self.v_layout)
+
+        def abrir_ventana_creacion(self):
+            self.ventana_creacion = VentanaCamion()
+            self.ventana_creacion.resultado_camion.connect(self.crear_camion)
+            self.ventana_creacion.show()
+
+        def crear_camion(self, nombre, capacidad, vueltas, entregas):
+            camion_creado = Camion(capacidad, 0, vueltas, entregas)
+            self.lista_camiones.addCamion(nombre, camion_creado)
+            self.ventana_creacion.close()
+
+    class RuteoRightLayout(QVBoxLayout):
+        def __init__(self):
+            super().__init__()
+            self.entregas = Entregas()
+
+            self.v_layout = QVBoxLayout()
+            self.v_layout.setSpacing(10)
+
+            self.label = QLabel("### Camiones considerados para Ruteo")
+            self.label.setTextFormat(Qt.TextFormat.MarkdownText)
+            self.label.setAlignment(
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
+            )
+            self.v_layout.addWidget(self.label)
+
+            self.lista_camiones = CamionListWidget()
+            for nombre, camion in self.entregas.camiones.items():
+                self.lista_camiones.addCamion(nombre, camion, ruteo=True)
+
+            self.v_layout.addWidget(self.lista_camiones)
+            self.addLayout(self.v_layout)
+
+            self.ruteo_boton = QPushButton("Calcular Vueltas y Servicios")
+            self.ruteo_boton.clicked.connect(self.ejecutar_modelo)
+            self.addWidget(self.ruteo_boton)
+
+        def ejecutar_modelo(self):
+            """
+            if len(self.lista_camiones.widgets_camiones) == 0:
+                self.generar_advertencia(
+                    "Es necesario por lo menos un camión para calcular rutas."
+                )
+                return
+
+            if self.worker_thread != None and self.worker_thread.isRunning():
+                self.generar_advertencia(
+                    "Ya se están calculando rutas. Se debe esperar a que termine el proceso."
+                )
+                return
+            """
+            camiones_ruteo = {}
+            for nombre, camion in [
+                x.getCamion() for x in self.lista_camiones.widgets_camiones
+            ]:
+                camiones_ruteo[nombre] = camion
+            self.worker_thread = RoutesThread(
+                VentanaDataframe.getDataFrame(), self.entregas, camiones_ruteo
+            )
+            self.worker_thread.setTerminationEnabled(True)
+            self.worker_thread.finished.connect(self.__on_finished)
+            self.worker_thread.start()
+            self.calc_dlg = ConfirmDialog(self.lista_camiones)
+            self.calc_dlg.salida_confirmada.connect(self.__on_model_cancel)
+            self.calc_dlg.exec()
+
+        def __on_model_cancel(self):
+            self.worker_thread.terminate()
+            self.calc_dlg.close_directly()
+
+        def __on_finished(self):
+            self.calc_dlg.close_directly()
 
 
 class ConfirmDialog(QDialog):
     salida_confirmada = pyqtSignal()
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowIcon(VentanaDataframe.getIcon())
@@ -203,19 +211,21 @@ class ConfirmDialog(QDialog):
         texto = "Calculando rutas para las entregas..."
         layout = QVBoxLayout()
         mensaje = QLabel(texto)
-        
+
         cancelar = QPushButton("Cancelar Ruteo")
         cancelar.clicked.connect(self.closeEvent)
-        
+
         layout.addWidget(mensaje)
-        layout.addWidget(cancelar)       
+        layout.addWidget(cancelar)
         self.setLayout(layout)
-        
+
     def closeEvent(self, event):
         confirmacion = QMessageBox.question(
-            self, "Confirmar", 
+            self,
+            "Confirmar",
             "¿Estás seguro de que quieres cancelar el cálculo de rutas?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
         if event == False:
             # al cancelar ruteo
             self.salida_confirmada.emit()
@@ -225,20 +235,37 @@ class ConfirmDialog(QDialog):
             self.salida_confirmada.emit()
         else:
             event.ignore()
-    
+
     def close_directly(self):
         self.closeEvent = lambda event: event.accept()
         self.close()
 
+
 class RoutesThread(QThread):
     finished = pyqtSignal()
-    
+
     def __init__(self, df, entregas, camiones):
         super().__init__()
         self.entregas: Entregas = entregas
         self.entregas.df_original = df
-        self.camiones = camiones
+        self.entregas.camiones = deepcopy(camiones)
 
     def run(self):
         self.entregas.ejecutar_modelo()
         self.finished.emit()
+
+
+if __name__ == "__main__":
+    app = QApplication(["TEST"])
+
+    window = VentanaRuteo()
+
+    camiones = {
+        "Sinotruk": Camion(26, 0, 2, 3),
+        "JAC": Camion(16, 0, 3, 6),
+        "Hyundai": Camion(6, 0, 3, 6),
+        "Externo_1": Camion(17, 0, 1, 7),
+    }
+
+    window.show()
+    sys.exit(app.exec())

@@ -126,7 +126,7 @@ class ModeloDataframeCoordenadas(ModeloDataframeFiltro):
         return (error_georef or fuera_de_stgo) and transporte_ext
     
 
-class ModeloDataframePagoDespacho(ModeloDataframeFiltro):
+class ModeloDataframeVerificacion(ModeloDataframeFiltro):
     def __init__(self):
         super().__init__(
             [
@@ -144,5 +144,5 @@ class ModeloDataframePagoDespacho(ModeloDataframeFiltro):
         idx_tipo_entrega = self.sourceModel().index(source_row, 6, source_parent)
         
         tipo_entrega = self.sourceModel().data(idx_tipo_entrega)
-        return (tipo_entrega == 'REVISAR DESPACHO GRATUITO NO INCLUIDO')
+        return (tipo_entrega in ['REVISAR DESPACHO GRATUITO NO INCLUIDO', 'SIN ESPECIFICAR'])
     

@@ -55,40 +55,6 @@ def obtener_dataframe(fecha: str):
     df.reset_index(drop=True, inplace=True)
     df = georef.pasar_a_coordenadas(df)
     return df
-  
-def separar_entregas(df: pd.DataFrame, capacidad_max_camion: float):
-    filas_separadas = []
-    df_entregas_a_separar = df[[vol > capacidad_max_camion for vol in df['VOLUMEN'].to_numpy()]]
-  
-    def separar_fila(fila):
-        bultos = fila['N° BULTOS']
-        volumen_unidad_teorica = fila['VOLUMEN']/bultos
-        peso_unidad_teorica = fila['PESO']/bultos
-        
-        bultos_primera_entrega = int(capacidad_max_camion/volumen_unidad_teorica)
-        primera_entrega = [
-            bultos_primera_entrega*volumen_unidad_teorica,
-            bultos_primera_entrega*peso_unidad_teorica,
-            bultos_primera_entrega
-        ]
-        
-        bultos_segunda_entrega = bultos - bultos_primera_entrega
-        segunda_entrega = [
-            bultos_segunda_entrega*volumen_unidad_teorica,
-            bultos_segunda_entrega*peso_unidad_teorica,
-            bultos_segunda_entrega
-        ]
-        
-        df.loc[fila.name, ['VOLUMEN', 'PESO', 'N° BULTOS']] = segunda_entrega
-        nueva_fila = df.loc[fila.name].copy()
-        nueva_fila[['VOLUMEN', 'PESO', 'N° BULTOS']] = primera_entrega
-        filas_separadas.append(nueva_fila)
-    
-    # apply va a ir llenando la lista filas_un_camion
-    df_entregas_a_separar.apply(lambda fila: separar_fila(fila), axis=1)
-    entregas_separadas = pd.DataFrame(filas_separadas, columns=df.columns)
-    return df, entregas_separadas
-
 
 def agrupar_entregas(df: pd.DataFrame):
     # TODO: ahora agruparemos por DIRECCIÓN y CLIENTE, concatenamos todo lo q no sea BULTOS VOLUMEN PESO
@@ -213,98 +179,98 @@ def procesar_query(fecha) -> pd.DataFrame:
     
     # ETA
     df_agrupado['fecha_llegada'] = df_agrupado['fecha_llegada'].apply(
-      lambda fecha: fecha.strftime('%d-%m-%Y') if pd.notna(fecha)
-      else "S/I"
+        lambda fecha: fecha.strftime('%d-%m-%Y') if pd.notna(fecha)
+        else "S/I"
     )
     
     # F.DESCONSOLIDADO
     df_agrupado['fecha_desconsolidado'] = df_agrupado['fecha_desconsolidado'].apply(
-      lambda fecha: fecha.strftime('%d-%m-%Y') if pd.notna(fecha)
-      else "S/I"
+        lambda fecha: fecha.strftime('%d-%m-%Y') if pd.notna(fecha)
+        else "S/I"
     )
     
     # estado_entrega (1 = 'TOTAL', 2 = 'PARCIAL', otro = 'S/I')
     df_agrupado['estado_entrega'] = df_agrupado['estado_entrega'].apply(
-      lambda x: 'TOTAL' if x == 1 
-      else 'PARCIAL' if x == 2 
-      else 'S/I'
+        lambda x: 'TOTAL' if x == 1 
+        else 'PARCIAL' if x == 2 
+        else 'S/I'
     )
     
     # estado_pago ('OK', 'NO', 'PENDIENTE FINANZAS')
     df_agrupado['estado_pago'] = df_agrupado['estado_pago'].apply(
-      lambda x: 'PENDIENTE FINANZAS' if pd.isna(x)
-      else 'OK' if x.upper() == 'SI'
-      else 'NO' if x.upper() == 'NO'
-      else x
+        lambda x: 'PENDIENTE FINANZAS' if pd.isna(x)
+        else 'OK' if x.upper() == 'SI'
+        else 'NO' if x.upper() == 'NO'
+        else x
     )
     
     comunas_no_incluidas_stgo = [49, 50, 51, 53, 57, 59, 61, 62, 64, 65, 66, 69, 71, 72, 76, 82, 88, 91]
     # generamos nueva columna llamada tipo_de_entrega
     df_agrupado['tipo_de_entrega'] = df_agrupado[['empresa_ext_despacho', 'empresa_ext_retiro', 'fk_bodega', 'fk_region', 'fk_comuna']].apply(
       lambda fila: 'DESPACHO TRANS.EXTERNO' if pd.notna(fila['empresa_ext_despacho']) # != null
-      else 'RETIRA TRANS.EXTERNO' if pd.notna(fila['empresa_ext_retiro']) # != null
-      else 'RETIRA CLIENTE' if pd.notna(fila['fk_bodega']) # != null
-      else 'SIN ESPECIFICAR' if pd.isna(fila['fk_region']) # == null
-      else 'DESPACHO GRATIS INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] not in comunas_no_incluidas_stgo) # == 12
-      else 'REVISAR DESPACHO GRATUITO NO INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] in comunas_no_incluidas_stgo)
-      else 'SIN ESPECIFICAR'
+        else 'RETIRA TRANS.EXTERNO' if pd.notna(fila['empresa_ext_retiro']) # != null
+        else 'RETIRA CLIENTE' if pd.notna(fila['fk_bodega']) # != null
+        else 'SIN ESPECIFICAR' if pd.isna(fila['fk_region']) # == null
+        else 'DESPACHO GRATIS INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] not in comunas_no_incluidas_stgo) # == 12
+        else 'REVISAR DESPACHO GRATUITO NO INCLUIDO' if (fila['fk_region'] == 12 and fila['fk_comuna'] in comunas_no_incluidas_stgo)
+        else 'SIN ESPECIFICAR'
     , axis=1)
     
     # 'QUIEN PROGRAMA'
     df_agrupado['quien'] = df_agrupado[['fk_usuario_despacho_retiro_nombre', 'fk_usuario_despacho_retiro_apellidos']].apply(
-      lambda fila: f"{fila['fk_usuario_despacho_retiro_nombre'].strip()} {fila['fk_usuario_despacho_retiro_apellidos'].strip()}" 
-      if pd.notna(fila['fk_usuario_despacho_retiro_apellidos']) and pd.notna(fila['fk_usuario_despacho_retiro_nombre'])
-      else f"{fila['fk_usuario_despacho_retiro_nombre'].strip()}" if pd.notna(fila['fk_usuario_despacho_retiro_nombre'])
-      else 'S/I'
+        lambda fila: f"{fila['fk_usuario_despacho_retiro_nombre'].strip()} {fila['fk_usuario_despacho_retiro_apellidos'].strip()}" 
+        if pd.notna(fila['fk_usuario_despacho_retiro_apellidos']) and pd.notna(fila['fk_usuario_despacho_retiro_nombre'])
+        else f"{fila['fk_usuario_despacho_retiro_nombre'].strip()}" if pd.notna(fila['fk_usuario_despacho_retiro_nombre'])
+        else 'S/I'
     , axis=1)
     
     # CLIENTE
     # formato es "('fk_cliente') 'fk_cliente_razon_social'"
     df_agrupado['cliente'] = df_agrupado[['fk_cliente', 'fk_cliente_razon_social']].apply(
-      lambda fila: f"({fila['fk_cliente']}) {fila['fk_cliente_razon_social'].strip()}"
+        lambda fila: f"({fila['fk_cliente']}) {fila['fk_cliente_razon_social'].strip()}"
     , axis=1)
     
     
     # TODO: FECHA SOLICITUD DESPACHO (?)
     df_agrupado['fecha_solicitud'] = df_agrupado[['fecha_despacho_retiro', 'fecha_fin_despacho_retiro']].apply(
-      lambda fila: f"{fila['fecha_despacho_retiro'].strftime('%d-%m-%Y %H:%M')} / {fila['fecha_fin_despacho_retiro'].strftime('%H:%M')}" 
-      if pd.notna(fila['fecha_fin_despacho_retiro']) and pd.notna(fila['fecha_despacho_retiro'])
-      else f"{fila['fecha_despacho_retiro'].strftime('%d-%m-%Y')}" if pd.notna(fila['fecha_despacho_retiro'])
-      else "S/I"
+        lambda fila: f"{fila['fecha_despacho_retiro'].strftime('%d-%m-%Y %H:%M')} / {fila['fecha_fin_despacho_retiro'].strftime('%H:%M')}" 
+        if pd.notna(fila['fecha_fin_despacho_retiro']) and pd.notna(fila['fecha_despacho_retiro'])
+        else f"{fila['fecha_despacho_retiro'].strftime('%d-%m-%Y')}" if pd.notna(fila['fecha_despacho_retiro'])
+        else "S/I"
     , axis=1)
 
     # FECHA PROG DESPACHO (?)
     df_agrupado['fecha_programada'] = df_agrupado['fecha_programada'].apply(
-      lambda fecha: fecha.strftime('%d-%m-%Y %H:%M') if pd.notna(fecha)
-      else 'S/I'
+        lambda fecha: fecha.strftime('%d-%m-%Y %H:%M') if pd.notna(fecha)
+        else 'S/I'
     )
     
     # DATOS CONTACTO RETIRO
     df_agrupado['retiro'] = df_agrupado[['rut_retiro', 'nombre_retiro', 'patente_retiro']].apply(
-      lambda fila: f"{fila['rut_retiro'].strip()}, {fila['nombre_retiro'].strip()}, {fila['patente_retiro'].strip()}"
-      if pd.notna(fila['rut_retiro']) or pd.notna(fila['nombre_retiro']) or pd.notna(fila['patente_retiro']) # se aplica or para que solo no printee
-      else "NO APLICA"                                                                                       # en caso de que no haya ningun dato
+        lambda fila: f"{fila['rut_retiro'].strip()}, {fila['nombre_retiro'].strip()}, {fila['patente_retiro'].strip()}"
+        if pd.notna(fila['rut_retiro']) or pd.notna(fila['nombre_retiro']) or pd.notna(fila['patente_retiro']) # se aplica or para que solo no printee
+        else "NO APLICA"                                                                                       # en caso de que no haya ningun dato
     , axis=1)
     
     # DATOS TRANSPORTE EXTERNO
     df_agrupado['emp_ext'] = df_agrupado[['empresa_ext_despacho', 'fk_direccion_empresa_ext', 'empresa_ext_retiro']].apply(
-      lambda fila: f"{fila['empresa_ext_despacho']} | {fila['fk_direccion_empresa_ext']}" if pd.notna(fila['empresa_ext_despacho'])
-      else fila['empresa_ext_retiro'] if pd.notna(fila['empresa_ext_retiro'])
-      else 'NO APLICA'
+        lambda fila: f"{fila['empresa_ext_despacho']} | {fila['fk_direccion_empresa_ext']}" if pd.notna(fila['empresa_ext_despacho'])
+        else fila['empresa_ext_retiro'] if pd.notna(fila['empresa_ext_retiro'])
+        else 'NO APLICA'
     , axis=1)
     
     # FECHA ENTREGA
     df_agrupado['fecha_entrega'] = df_agrupado['fecha_entrega'].apply(
-      lambda x: x.strftime('%d-%m-%Y') if pd.notna(x)
-      else 'S/I'
+        lambda x: x.strftime('%d-%m-%Y') if pd.notna(x)
+        else 'S/I'
     )
     
     # CONDUCTOR
     # conductor_nombre, conductor_apellido
     df_agrupado['conductor'] = df_agrupado[['conductor_nombre', 'conductor_apellido']].apply(
-      lambda fila: f"{fila['conductor_nombre'].strip()} {fila['conductor_apellido'].strip()}" if pd.notna(fila['conductor_nombre']) and pd.notna(fila['conductor_apellido'])
-      else f"{fila['conductor_nombre'].strip()}" if pd.notna(fila['conductor_nombre'])
-      else 'S/I'
+        lambda fila: f"{fila['conductor_nombre'].strip()} {fila['conductor_apellido'].strip()}" if pd.notna(fila['conductor_nombre']) and pd.notna(fila['conductor_apellido'])
+        else f"{fila['conductor_nombre'].strip()}" if pd.notna(fila['conductor_nombre'])
+        else 'S/I'
     , axis=1)
     
     # al final queremos un DataFrame igual al excel de programacion de despacho que se está generando actualmente

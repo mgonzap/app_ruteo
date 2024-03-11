@@ -173,6 +173,9 @@ def obtener_entregas_clientes(fecha_filtrado: str, lista_clientes: list[str], df
 
     df = procesar_query(df_query)
     
+    if df.empty:
+        return df
+    
     # obtenemos filas sin direccion ni datos transporte externo.
     filas_sin_direccion = df[(df['DIRECCION'] == ' , , ') & (df['DATOS TRANSPORTE EXTERNO'] == 'NO APLICA')]
     

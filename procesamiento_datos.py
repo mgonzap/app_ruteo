@@ -34,7 +34,63 @@ def obtener_dataframe_datos(fecha: str):
     
     # retiros directamente en bodega, por lo tanto no lo georreferenciamos
     # Filtrar y guardar en su propio DataFrame
-    df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])]
+    
+    df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])].copy()
+    
+    df_retiros = df_retiros.rename(columns={
+        "VOLUMEN": "(m³)",
+        "CONTENEDOR": "N° CONTENEDOR",
+        "SERVICIO": "N° SERVICIO",
+        "EJECUTIVO": "EJECUTIVO CUENTA",
+        "N° BULTOS": "BULTOS",
+        "DIRECCION": "DIRECCIÓN",
+        "DATOS TRANSPORTE EXTERNO": "EMPRESA EXT"
+    })
+    df_retiros['RUTA'] = 'S/I'
+    df_retiros['(m³) TOTAL RUTA'] = df_retiros['(m³)']
+    df_retiros['ORDEN'] = 0
+    df_retiros['CAMIÓN'] = df_retiros['TIPO DE ENTREGA']
+    df_retiros['FECHAS'] = df_retiros[['ETA', 'F.DESCONSOLIDADO', 'FECHA PROG DESPACHO', 'FECHA SOLICITUD DESPACHO']].apply(
+        lambda fila:
+            f"ETA: {fila['ETA']} "
+            + f"DESC: {fila['F.DESCONSOLIDADO']} "
+            + f"PROG: {fila['FECHA PROG DESPACHO'] if fila['FECHA PROG DESPACHO'] != 'S/I' else fila['FECHA SOLICITUD DESPACHO']} ENT: "
+    , axis=1)
+    df_retiros['OBSERVACIONES'] = df_retiros[['OBS.CLIENTE', 'OBSERVACIONES']].apply(
+        lambda fila:
+            f'{fila["OBS.CLIENTE"] if fila["OBS.CLIENTE"] != None else ""}, '
+            + f'{fila["OBSERVACIONES"] if fila["OBSERVACIONES"] != None else ""}'
+    , axis=1)
+    df_retiros['CONTACTO'] = df_retiros["TELEF. CONTACTO"]
+    df_retiros['CHOFER'] = 'S/I'
+    df_retiros['ESTADO'] = 'S/I'
+    df_retiros['FECHA PROGRAMADA'] = df_retiros["fecha_despacho_retiro"]
+    df_retiros['ESTADO REVISIÓN'] = ''
+    
+    df_retiros = df_retiros[[
+        "RUTA",
+        "(m³) TOTAL RUTA",
+        "ORDEN",
+        "N° CARPETA",
+        "EJECUTIVO CUENTA",
+        "CLIENTE",
+        "N° CONTENEDOR",
+        "N° SERVICIO",
+        "(m³)",
+        "BULTOS",
+        "FECHAS",
+        "CAMIÓN",
+        "DIRECCIÓN",
+        "COMUNA",
+        "EMPRESA EXT",
+        "CONTACTO",
+        "OBSERVACIONES",
+        "CHOFER",
+        "ESTADO",
+        "FECHA PROGRAMADA",
+        "ESTADO REVISIÓN"
+    ]]
+    
     try:
         if not os.path.exists('retiros'):
             os.makedirs('retiros')

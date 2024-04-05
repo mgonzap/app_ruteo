@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QMessageBox
 )
 import pandas as pd
-from procesamiento_datos import obtener_dataframe
+from procesamiento_datos import obtener_dataframe_datos, obtener_dataframe_entregas_clientes
 
 path_icono = "logo\\WSC-LOGO2.ico"
 
@@ -45,5 +45,18 @@ class DataThread(QThread):
         self.setTerminationEnabled(True)
     
     def run(self):
-        df = obtener_dataframe(self.fecha)
+        df = obtener_dataframe_datos(self.fecha)
+        self.finished.emit(df)
+        
+class EntregasClientesThread(QThread):
+    finished = pyqtSignal(pd.DataFrame)
+    def __init__(self, fecha, lista_clientes, df_original):
+        super().__init__()
+        self.fecha = fecha
+        self.lista_clientes = lista_clientes
+        self.df_original = df_original
+        self.setTerminationEnabled(True)
+    
+    def run(self):
+        df = obtener_dataframe_entregas_clientes(self.fecha, self.lista_clientes, self.df_original)
         self.finished.emit(df)

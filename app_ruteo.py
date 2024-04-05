@@ -673,6 +673,15 @@ class Entregas:
 
                 df_excel = pd.DataFrame(lista_filas, columns=cols)
                 try:
+                    if os.path.exists(f"retiros/retiros-{self.fecha_filtrado}.xlsx"):
+                        df_retiros = pd.read_excel(f"retiros/retiros-{self.fecha_filtrado}.xlsx")
+                        df_retiros = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
+                        if not df_retiros.empty:
+                            df_excel = pd.concat([df_excel, df_retiros])
+                except:
+                    print("No se encontraron retiros.")
+                    
+                try:
                     if not os.path.exists(f"resumen_despachos/{self.fecha_filtrado}"):
                         os.makedirs(f"resumen_despachos/{self.fecha_filtrado}")
                     df_excel.to_excel(

@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QSizePolicy,
-    QScrollArea
+    QScrollArea,
+    QMessageBox,
 )
 from PyQt6.QtGui import QIcon
 from app_ruteo import Camion
@@ -17,6 +18,7 @@ from ventana_camiones import VentanaCamion
 
 class CamionWidget(QFrame):
     camion_enviado = pyqtSignal(str, Camion)
+    camion_editado = pyqtSignal()
 
     edit_icon = QIcon("icons\\pencil-square.svg")
     add_icon = QIcon("icons\\box-arrow-in-right.svg")
@@ -124,7 +126,6 @@ class CamionWidget(QFrame):
         return button
 
     def __on_enviar_camion__(self):
-        print(f"enviar {self.nombre}: {self.camion}")
         self.camion_enviado.emit(self.nombre, self.camion)
 
     def __on_editar_camion__(self):
@@ -150,6 +151,7 @@ class CamionWidget(QFrame):
         self.camion_entregas.setCantidad(entregas)
 
         self.ventana_edicion.close()
+        self.camion_editado.emit()
 
     def getCamion(self):
         return (self.nombre, self.camion)
@@ -228,6 +230,7 @@ class CamionWidget(QFrame):
 
 class CamionListWidget(QScrollArea):
     camion_enviado = pyqtSignal(str, Camion)
+    cambio = pyqtSignal()
     
     def __init__(self, ruteo: bool = False) -> None:
         super().__init__()
@@ -248,20 +251,24 @@ class CamionListWidget(QScrollArea):
         if nombre not in [x.getCamion()[0] for x in self.widgets_camiones]:
             camion_widget = CamionWidget(nombre, camion, ruteo)
             camion_widget.camion_enviado.connect(self.sendCamion)
+            camion_widget.camion_editado.connect(self.cambio.emit)
             self.widgets_camiones.append(camion_widget)
             self.vbox_layout.addWidget(camion_widget)
+            self.cambio.emit()
     
     def sendCamion(self, nombre, camion):
-        if self.ruteo:
-            # Si es el ultimo camion, qmessagebox con warning y no emitir
-            pass
-        
-        self.camion_enviado.emit(nombre, camion)
         for widget in self.widgets_camiones:
             if (widget.nombre == nombre):
+                if self.ruteo and len(self.widgets_camiones) <= 1:
+                    # Si es el ultimo camion, qmessagebox con warning y no emitir
+                    QMessageBox.warning(
+                        self, "Aviso",
+                        "Debe quedar por lo menos un camión en el ruteo."
+                    )
+                    return
                 self.vbox_layout.removeWidget(widget)
                 self.widgets_camiones.remove(widget)
-        pass
+                self.camion_enviado.emit(nombre, camion)
     
     def toDict(self):
         dict_camiones = {}

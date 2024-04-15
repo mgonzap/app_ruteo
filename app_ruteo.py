@@ -13,6 +13,7 @@ import os
 import webbrowser
 import pandas as pd
 from copy import deepcopy
+from base_datos import subir_resumen_despacho
 
 
 def verificar_elemento_mayor(lista, numero):
@@ -688,6 +689,7 @@ class Entregas:
                         f"resumen_despachos/{self.fecha_filtrado}/resumen-{i}_rutas.xlsx",
                         index=False,
                     )
+                    subir_resumen_despacho(df_excel)
                 except PermissionError:
                     print("No se pudo generar el excel de resumen despacho.")
 

@@ -241,7 +241,7 @@ def obtener_entregas_clientes(fecha_filtrado: str, lista_clientes: list[str], df
         mismo_cliente = df_original[df_original['CLIENTE'] == row['CLIENTE']]
         row[['TIPO DE ENTREGA', 'DIRECCION', 'COMUNA', 'DATOS TRANSPORTE EXTERNO']] = mismo_cliente.iloc[0][['TIPO DE ENTREGA', 'DIRECCION', 'COMUNA', 'DATOS TRANSPORTE EXTERNO']]
         # la aplicamos
-        df.iloc[idx] = row
+        df.loc[idx] = row
     
     return df
     

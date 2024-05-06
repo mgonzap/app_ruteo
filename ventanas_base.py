@@ -65,9 +65,9 @@ class Ventana(QMainWindow):
 
 # Clase retiene dataframe
 class VentanaDataframe(Ventana):
-    # Clase utilizara CamelCase en funciones para mantener consistencia con Qt
     # Variables de clase, se comparten entre todas las instancias
     __df: DataFrame | None = None
+    __clients_df: DataFrame | None = None
     __fecha: str = ''
     def __init__(
             self, parent: QWidget | None = None,
@@ -81,6 +81,14 @@ class VentanaDataframe(Ventana):
     @classmethod
     def getDataFrame(cls) -> DataFrame | None:
         return cls.__df
+    
+    @classmethod
+    def setClientesDataFrame(cls, df: DataFrame) -> None:
+        cls.__clients_df = df
+        
+    @classmethod
+    def getClientesDataFrame(cls) -> DataFrame | None:
+        return cls.__clients_df
     
     @classmethod
     def setFecha(cls, fecha: str) -> None:
@@ -135,7 +143,7 @@ class VentanaVistaDataframe(VentanaDataframe):
         content_height = self._view.getContentHeight()
         height = max(
             350,
-            min(screen_size.height(), content_height)
+            min(screen_size.height() - 50, content_height)
         )
         self.resize(QSize(screen_size.width(), height))
         if move_to_center:

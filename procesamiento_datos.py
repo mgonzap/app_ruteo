@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 from datetime import date
 from base_datos import *
 import georef
@@ -34,7 +35,69 @@ def obtener_dataframe(fecha: str):
     
     # retiros directamente en bodega, por lo tanto no lo georreferenciamos
     # Filtrar y guardar en su propio DataFrame
-    df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])]
+    df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])].copy()
+    
+    df_retiros = df_retiros.rename(columns={
+        "VOLUMEN": "(m³)",
+        "CONTENEDOR": "N° CONTENEDOR",
+        "SERVICIO": "N° SERVICIO",
+        "EJECUTIVO": "EJECUTIVO CUENTA",
+        "N° BULTOS": "BULTOS",
+        "DIRECCION": "DIRECCIÓN",
+        "DATOS TRANSPORTE EXTERNO": "EMPRESA EXT"
+    })
+    df_retiros['RUTA'] = 'RETIRO'
+    df_retiros['(m³) TOTAL RUTA'] = df_retiros['(m³)']
+    df_retiros['ORDEN'] = 0
+    df_retiros['CAMIÓN'] = df_retiros['TIPO DE ENTREGA']
+    df_retiros['FECHAS'] = df_retiros[['ETA', 'F.DESCONSOLIDADO', 'FECHA PROG DESPACHO', 'FECHA SOLICITUD DESPACHO']].apply(
+        lambda fila:
+            f"ETA: {fila['ETA']} "
+            + f"DESC: {fila['F.DESCONSOLIDADO']} "
+            + f"PROG: {fila['FECHA PROG DESPACHO'] if fila['FECHA PROG DESPACHO'] != 'S/I' else fila['FECHA SOLICITUD DESPACHO']} ENT: "
+    , axis=1)
+    df_retiros['OBSERVACIONES'] = df_retiros[['OBS.CLIENTE', 'OBSERVACIONES']].apply(
+        lambda fila:
+            f'{fila["OBS.CLIENTE"] if fila["OBS.CLIENTE"] != None else ""}, '
+            + f'{fila["OBSERVACIONES"] if fila["OBSERVACIONES"] != None else ""}'
+    , axis=1)
+    df_retiros['CONTACTO'] = df_retiros["TELEF. CONTACTO"]
+    df_retiros['CHOFER'] = 'S/I'
+    df_retiros['ESTADO'] = 'S/I'
+    df_retiros['FECHA PROGRAMADA'] = df_retiros["fecha_despacho_retiro"]
+    df_retiros['ESTADO REVISIÓN'] = ''
+    
+    df_retiros = df_retiros[[
+        "RUTA",
+        "(m³) TOTAL RUTA",
+        "ORDEN",
+        "N° CARPETA",
+        "EJECUTIVO CUENTA",
+        "CLIENTE",
+        "N° CONTENEDOR",
+        "N° SERVICIO",
+        "(m³)",
+        "BULTOS",
+        "FECHAS",
+        "CAMIÓN",
+        "DIRECCIÓN",
+        "COMUNA",
+        "EMPRESA EXT",
+        "CONTACTO",
+        "OBSERVACIONES",
+        "CHOFER",
+        "ESTADO",
+        "FECHA PROGRAMADA",
+        "ESTADO REVISIÓN"
+    ]]
+    
+    try:
+        if not os.path.exists('retiros'):
+            os.makedirs('retiros')
+        df_retiros.to_excel(f"retiros/retiros-{fecha}.xlsx", index=False)
+    except PermissionError:
+        print(f"No se pudo escribir 'retiros/retiros-{fecha}.xlsx', permiso denegado.")
+    
     try:
         if not os.path.exists('retiros'):
             os.makedirs('retiros')
@@ -127,19 +190,31 @@ def procesar_query(fecha) -> pd.DataFrame:
         else:
             return x
     # al recibir las fechas están en UTC, por lo que hay que pasarlas
-    # a timezone chileno (generalmente -03:00) para convertir df a excel    
+    # a timezone chileno (generalmente -03:00) para convertir df a excel
+    lista_columnas_fecha = [
+        'fecha_llegada', 
+        'fecha_desconsolidado',
+        'fecha_despacho_retiro', 
+        'fecha_fin_despacho_retiro', 
+        'fecha_entrega', 
+        'fecha_programada',
+        'fecha_registro'
+    ]
+    
+    for col in lista_columnas_fecha:
+        if (df_query[col].dtype != np.dtype('datetime64[ns]')):
+            df_query[col] = pd.to_datetime(df_query[col], utc=True)
+    
     for col in df_query.select_dtypes(include=['datetime64[ns, UTC]']).columns:
         df_query[col] = df_query[col].apply(convertir_a_tz_chile)
-    #print(df_query['fecha_despacho_retiro'])
     
     if df_query.empty:
         return df_query
       
     try:
-        query_excel_path = 'test/excel_query.xlsx'
-        if not os.path.exists(query_excel_path):
-            os.makedirs(query_excel_path)
-        df_query.to_excel(query_excel_path, index=False)
+        if not os.path.exists('test'):
+            os.makedirs('test')
+        df_query.to_excel('test/excel_query.xlsx', index=False)
     except PermissionError:
         print("No se pudo acceder a test/excel_query.xlsx, permiso denegado.")
 

@@ -68,6 +68,13 @@ class VistaDataframeEliminacion(VistaDataframe):
         if isinstance(model, QSortFilterProxyModel):
             model = model.sourceModel()
         return model
+    
+    def getSourceRow(self, index: QModelIndex) -> int:
+        model = self.model()
+        if isinstance(model, QSortFilterProxyModel):
+            return model.mapToSource(index).row()
+        else:
+            return index.row()
         
     def showCustomContextMenu(self, pos: QPoint):
         model = self.getDataframeModel()
@@ -77,14 +84,16 @@ class VistaDataframeEliminacion(VistaDataframe):
     
     def toggleRowDeletion(self):
         model = self.getDataframeModel()
-        row = self.selectionModel().currentIndex().row()
-        if not model.isRowInRemoveList(row):
-            model.addToRowRemoveList(row)
+        view_row = self.selectionModel().currentIndex().row()
+        df_row = self.getSourceRow(self.selectionModel().currentIndex())
+        if not model.isRowInRemoveList(df_row):
+            model.addToRowRemoveList(df_row)
             # Model can reject adding the row
-            if model.isRowInRemoveList(row):
-                self.setItemDelegateForRow(row, self.delegado_eliminacion)
+            if model.isRowInRemoveList(df_row):
+                self.setItemDelegateForRow(view_row, self.delegado_eliminacion)
         else:
-            model.removeFromRowRemoveList(row)
+            model.removeFromRowRemoveList(df_row)
+            self.setItemDelegateForRow(view_row, self.itemDelegate())
         self.selectionModel().clearSelection()
 
 

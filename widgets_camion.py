@@ -17,6 +17,7 @@ from ventana_camiones import VentanaCamion
 
 class CamionWidget(QFrame):
     camion_enviado = pyqtSignal(str, Camion)
+    cambio = pyqtSignal()
 
     edit_icon = QIcon("icons\\pencil-square.svg")
     add_icon = QIcon("icons\\box-arrow-in-right.svg")
@@ -150,6 +151,7 @@ class CamionWidget(QFrame):
         self.camion_entregas.setCantidad(entregas)
 
         self.ventana_edicion.close()
+        self.cambio.emit()
 
     def getCamion(self):
         return (self.nombre, self.camion)
@@ -228,6 +230,7 @@ class CamionWidget(QFrame):
 
 class CamionListWidget(QScrollArea):
     camion_enviado = pyqtSignal(str, Camion)
+    cambio = pyqtSignal()
     
     def __init__(self, ruteo: bool = False) -> None:
         super().__init__()
@@ -248,8 +251,10 @@ class CamionListWidget(QScrollArea):
         if nombre not in [x.getCamion()[0] for x in self.widgets_camiones]:
             camion_widget = CamionWidget(nombre, camion, ruteo)
             camion_widget.camion_enviado.connect(self.sendCamion)
+            camion_widget.cambio.connect(self.cambio.emit)
             self.widgets_camiones.append(camion_widget)
             self.vbox_layout.addWidget(camion_widget)
+            self.cambio.emit()
     
     def sendCamion(self, nombre, camion):
         if self.ruteo:
@@ -261,7 +266,7 @@ class CamionListWidget(QScrollArea):
             if (widget.nombre == nombre):
                 self.vbox_layout.removeWidget(widget)
                 self.widgets_camiones.remove(widget)
-        pass
+        self.cambio.emit()
     
     def toDict(self):
         dict_camiones = {}

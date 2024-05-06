@@ -372,18 +372,18 @@ class Entregas:
         colores_clusters = [
             "red",
             "green",
-            "blue",
+            "cadetblue",
             "darkred",
             "orange",
             "purple",
             "pink",
             "yellow",
-            "brown",
+            "beige",
             "cyan",
             "gray",
             "magenta",
             "teal",
-            "lime",
+            "lightgreen",
             "white",
         ]
 
@@ -416,7 +416,131 @@ class Entregas:
         # print(self.camiones)
         self.cargar_datos()
         K = self.sumar_vueltas()
-        # K = 15
+        K = 25
+        
+        if (self.df.shape[0] == 1):
+            cols = [
+                "RUTA",
+                "(m³) TOTAL RUTA",
+                "ORDEN",
+                "N° CARPETA",
+                "EJECUTIVO CUENTA",
+                "CLIENTE",
+                "N° CONTENEDOR",
+                "N° SERVICIO",
+                "(m³)",
+                "BULTOS",
+                "FECHAS",
+                "CAMIÓN",
+                "DIRECCIÓN",
+                "COMUNA",
+                "EMPRESA EXT",
+                "CONTACTO",
+                "OBSERVACIONES",
+                "CHOFER",
+                "ESTADO",
+                "FECHA PROGRAMADA",
+                "ESTADO REVISIÓN",
+            ]
+            fila_df = self.df.iloc[0]
+            
+            ruta = 1
+            vol_ruta = fila_df["VOLUMEN"].round(2)
+            orden = 0  # TODO: como se determina?
+            n_carpeta = fila_df["N° CARPETA"]
+            ejecutivo = fila_df["EJECUTIVO"]
+            cliente = fila_df["CLIENTE"]
+            contenedor = fila_df["CONTENEDOR"]
+            n_servicio = fila_df["SERVICIO"]
+            volumen = fila_df["VOLUMEN"].round(2)
+            bultos = fila_df["N° BULTOS"]
+            fechas_str = (
+                f"ETA: {fila_df['ETA']} "
+                + f"DESC: {fila_df['F.DESCONSOLIDADO']} "
+                + f"PROG: {fila_df['FECHA PROG DESPACHO'] if fila_df['FECHA PROG DESPACHO'] != 'S/I' else fila_df['FECHA SOLICITUD DESPACHO']} ENT: "
+            )
+            # DETERMINAR CAMION:
+            # sub capacidad <= VOL_TOTAL_CLUSTER <= capacidad
+            camion_str = "S/I"
+            for nombre, camion in self.camiones_copia.items():
+                # no vemos por el item individual, si no por la suma de su cluster
+                if camion.sub_capacidad <= volumen <= camion.capacidad:
+                    camion_str = nombre.upper()
+                    if camion_str == "S/I":
+                        # print(cluster_sum)
+                        pass
+
+            direccion = fila_df["DIRECCION"]
+            comuna = fila_df["COMUNA"]
+            empresa_ext = fila_df["DATOS TRANSPORTE EXTERNO"]
+            contacto = fila_df["TELEF. CONTACTO"]
+            obs_cliente = (
+                fila_df["OBS.CLIENTE"]
+                if fila_df["OBS.CLIENTE"] != None
+                    else ""
+            )
+            obs = (
+                fila_df["OBSERVACIONES"]
+                if fila_df["OBSERVACIONES"] != None
+                    else ""
+            )
+            observaciones = ", ".join([obs_cliente, obs])
+            chofer = fila_df["CONDUCTOR"]
+            # estado = fila_df['ESTADO DE ENTREGA'].values[0] # TODO: que estado? 'ESTADO PAGO' O 'ESTADO DE ENTREGA'?
+            estado = "S/I"
+            fecha_prog = fila_df["fecha_despacho_retiro"]
+            estado_revision = ""
+
+            fila: pd.Series = pd.Series(
+                [
+                    ruta,
+                    vol_ruta,
+                    orden,
+                    n_carpeta,
+                    ejecutivo,
+                    cliente,
+                    contenedor,
+                    n_servicio,
+                    volumen,
+                    bultos,
+                    fechas_str,
+                    camion_str,
+                    direccion,
+                    comuna,
+                    empresa_ext,
+                    contacto,
+                    observaciones,
+                    chofer,
+                    estado,
+                    fecha_prog,
+                    estado_revision,
+                ],
+                index=cols,
+            )
+            df_excel = pd.DataFrame([fila], columns=cols)
+            try:
+                if os.path.exists(f"retiros/retiros-{self.fecha_filtrado}.xlsx"):
+                    df_retiros = pd.read_excel(f"retiros/retiros-{self.fecha_filtrado}.xlsx")
+                    df_retiros = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
+                    if not df_retiros.empty:
+                        df_excel = pd.concat([df_excel, df_retiros])
+            except Exception as e:
+                print(e)
+                print("No se encontraron retiros.")
+                    
+            try:
+                if not os.path.exists(f"resumen_despachos/{self.fecha_filtrado}"):
+                    os.makedirs(f"resumen_despachos/{self.fecha_filtrado}")
+                df_excel.to_excel(
+                    f"resumen_despachos/{self.fecha_filtrado}/resumen-1_ruta.xlsx",
+                    index=False,
+                )
+            except PermissionError:
+                print("No se pudo generar el excel de resumen despacho.")
+            
+            print("Se ha calculado la ruta, revise la carpeta resumen_despachos")
+            return
+    
 
         for i in range(2, K):
             try:
@@ -432,10 +556,10 @@ class Entregas:
                 for k in range(i):
                     cluster_points = self.array_tridimensional[labels == k]
                     cluster_sum = cluster_points[:, 2].sum()
-                    print(f"Cluster {k + 1}:")
-                    print("Centroide:", centroids[k, :2])
-                    print("Puntos en el cluster:", cluster_points)
-                    print(f"Suma de la columna extra en el cluster: {cluster_sum}\n")
+                    #print(f"Cluster {k + 1}:")
+                    #print("Centroide:", centroids[k, :2])
+                    #print("Puntos en el cluster:", cluster_points)
+                    #print(f"Suma de la columna extra en el cluster: {cluster_sum}\n")
 
             try:
                 self.crear_mapa(self.array_tridimensional, labels, i)
@@ -445,7 +569,8 @@ class Entregas:
                 print(f"No hay solución factible para {i} rutas...")
 
             # Modificar excel..?
-            if centroids is not None:             
+            if centroids is not None:
+                print("Se ha encontrado un ruteo factible.")             
                 directorio_actual = os.getcwd()
                 if not os.path.exists(f"rutas/{self.fecha_filtrado}"):
                     os.makedirs(f"rutas/{self.fecha_filtrado}")
@@ -672,6 +797,15 @@ class Entregas:
                     ruta += 1
 
                 df_excel = pd.DataFrame(lista_filas, columns=cols)
+                try:
+                    if os.path.exists(f"retiros/retiros-{self.fecha_filtrado}.xlsx"):
+                        df_retiros = pd.read_excel(f"retiros/retiros-{self.fecha_filtrado}.xlsx")
+                        df_retiros = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
+                        if not df_retiros.empty:
+                            df_excel = pd.concat([df_excel, df_retiros])
+                except:
+                    print("No se encontraron retiros.")
+                    
                 try:
                     if not os.path.exists(f"resumen_despachos/{self.fecha_filtrado}"):
                         os.makedirs(f"resumen_despachos/{self.fecha_filtrado}")

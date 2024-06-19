@@ -138,7 +138,7 @@ class Entregas:
                 ]
 
                 # guardamos la nueva fila en la lista de entregas separadas
-                nueva_fila = df.iloc[fila.name].copy()
+                nueva_fila = df.loc[fila.name].copy()
                 nueva_fila[["VOLUMEN", "PESO", "N° BULTOS"]] = nueva_entrega
                 lista_entregas_separadas.append(nueva_fila)
 

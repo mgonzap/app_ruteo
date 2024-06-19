@@ -13,7 +13,6 @@ from modelos_dataframe import ModeloDataframe, ModeloDataframeCoordenadas
 import pandas as pd
 import os
 
-
 class VistaDataframe(QTableView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -25,7 +24,7 @@ class VistaDataframe(QTableView):
         
     def getContentHeight(self):
         return int(
-            (self.rowHeight(0) + 10) * self.model().rowCount() \
+            self.rowHeight(0) * self.model().rowCount() \
                 + self.horizontalHeader().height() \
                     + 2 * self.frameWidth())
         
@@ -52,17 +51,6 @@ class EliminacionDelegate(QStyledItemDelegate):
                 option.backgroundBrush = QColor(50, 150, 50)
                 painter.fillRect(option.rect, option.backgroundBrush)
         super().paint(painter, option, index)
-        
-
-class AdvertenciaDelegate(QStyledItemDelegate):
-    def paint(self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        painter.fillRect(option.rect, QColor(255, 166, 13))
-        if (option.state & QStyle.StateFlag.State_Selected) == QStyle.StateFlag.State_Selected:
-            if (option.state & QStyle.StateFlag.State_Active) != QStyle.StateFlag.State_Active:
-                option.backgroundBrush = QColor(50, 150, 50)
-                painter.fillRect(option.rect, option.backgroundBrush)
-        super().paint(painter, option, index)
-
 
 class VistaDataframeEliminacion(VistaDataframe):
     def __init__(
@@ -104,32 +92,17 @@ class VistaDataframeEliminacion(VistaDataframe):
             if model.isRowInRemoveList(df_row):
                 self.setItemDelegateForRow(view_row, self.delegado_eliminacion)
         else:
-
             model.removeFromRowRemoveList(df_row)
             self.setItemDelegateForRow(view_row, self.itemDelegate())
-
         self.selectionModel().clearSelection()
 
-
-class VistaDataframeNoProgramados(VistaDataframeEliminacion):
-    def __init__(
-            self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.delegado_advertencia = AdvertenciaDelegate()
-
-    def setModel(self, model: ModeloDataframeCoordenadas | None) -> None:
-        super().setModel(model)
-        for row in range(model.rowCount()):
-            # DATOS TRANSPORTE EXTERNO
-            idx = self.model().index(row, 18)
-            print(self.model().data(idx))
-            if (self.model().data(idx) == 'S/I'):
-                self.setItemDelegateForRow(row, self.delegado_advertencia)
-                pass
 
 class VistaDataframePagoDespacho(VistaDataframeEliminacion):
     def __init__(
             self, parent: QWidget | None = None) -> None:
+        # TODO: can_remove_all puede causar problemas
+        #       si es que todos los despachos disponibles tienen que revisarse
+        #       puede que terminemos eliminando todos los despachos q hay 
         super().__init__(parent)
     
     def setModel(self, model: ModeloDataframeCoordenadas | None) -> None:

@@ -31,67 +31,7 @@ class VentanaDespachos(VentanaDataframeEliminacion):
         self.layout.addWidget(self.createQPushButton("Finalizar", self.process_deletion))
         
         self.resizeToContents(move_to_center=True)
-
-
-class VentanaDespachosClientesVerificacion(VentanaDataframeEliminacion):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(
-            parent, "Verificar despachos no programados", 
-            safe_to_close=False
-        )
-        
-        self.model = ModeloDataframe(self.getClientesDataFrame())
-
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        
-        self.layout = QVBoxLayout(self.central_widget)
-        
-        ## ORIGINAL
-        self.label_nombre = QLabel(
-            "Estos son los despachos programados para la fecha solicitada."
-        )
-        self.layout.addWidget(self.label_nombre)
-        
-        self.view = VistaDataframe(self)
-        self.view.setModel(ModeloDataframe(self.getDataFrame()))
-        self.layout.addWidget(self.view)
-        
-        ## NO PROGRAMADOS
-        self.label_nombre_no_prog = QLabel(
-            "Aquí se presentan despachos asociados a los clientes, pero que no tienen fecha programada de despacho. Es posible marcarlos para eliminación con el click derecho."
-        )
-        self.layout.addWidget(self.label_nombre_no_prog)
-        
-        self.view_no_prog = VistaDataframeNoProgramados(self)
-        self.view_no_prog.setModel(ModeloDataframe(self.getClientesDataFrame()))
-        self.layout.addWidget(self.view_no_prog)
-            
-        self.layout.addWidget(self.createQPushButton("Finalizar", self.process_deletion))
-        
-        self.resizeToContents(move_to_center=True)
-        
-    def resizeToContents(self, move_to_center: bool = False):
-        if self.view == None:
-            return
-        content_height = self.view.getContentHeight()
-        ext_height = 0
-        if self.view_no_prog != None:
-            ext_height = self.view_no_prog.getContentHeight()
-        biggest_view = max(content_height, ext_height)
-        content_height = biggest_view * 2
-        screen_size = QGuiApplication.primaryScreen().availableSize()
-        height = max(
-            350,
-            min(screen_size.height() - 50, content_height)
-        )
-        self.resize(QSize(screen_size.width(), height))
-        if move_to_center:
-            self.move(
-                0, 
-                int((screen_size.height() - height)/2)
-            )
-        
+    
 
 class VentanaDespachosVerificacion(VentanaDataframeEliminacion):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -116,8 +56,6 @@ class VentanaDespachosVerificacion(VentanaDataframeEliminacion):
         self.layout.addWidget(self.createQPushButton("Finalizar", self.process_deletion))
         
         self.resizeToContents(move_to_center=True)
-    
-    
 
 
 class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
@@ -183,12 +121,11 @@ class VentanaDespachosCoordenadas(VentanaDataframeEliminacion):
         ext_height = 0
         if self.view_ext != None:
             ext_height = self.view_ext.getContentHeight()
-        biggest_view = max(content_height, ext_height)
-        content_height = biggest_view * 2
         screen_size = QGuiApplication.primaryScreen().availableSize()
+        content_height +=  ext_height
         height = max(
             350,
-            min(screen_size.height() - 50, content_height)
+            min(screen_size.height(), content_height)
         )
         self.resize(QSize(screen_size.width(), height))
         if move_to_center:

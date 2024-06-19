@@ -13,7 +13,6 @@ import os
 import webbrowser
 import pandas as pd
 from copy import deepcopy
-from base_datos import subir_resumen_despacho
 
 
 def verificar_elemento_mayor(lista, numero):
@@ -139,7 +138,7 @@ class Entregas:
                 ]
 
                 # guardamos la nueva fila en la lista de entregas separadas
-                nueva_fila = df.loc[fila.name].copy()
+                nueva_fila = df.iloc[fila.name].copy()
                 nueva_fila[["VOLUMEN", "PESO", "N° BULTOS"]] = nueva_entrega
                 lista_entregas_separadas.append(nueva_fila)
 
@@ -265,7 +264,7 @@ class Entregas:
             return df_sorted, df_entregas_separadas
 
     # Se recibe el df procesado en procesar_datos.py
-    def cargar_datos(self):
+    def cargar_datos(self, fecha_filtrado):
         self.ordenar_camiones()
         # respaldo
         self.camiones_copia = deepcopy(self.camiones)
@@ -274,7 +273,7 @@ class Entregas:
         self.df, self.df_separados = self.separar_entregas(self.df_original.copy())
         #print("after separar:", self.camiones)
         #print(self.df[["N° BULTOS", "VOLUMEN"]])
-        self.fecha_filtrado = self.df["FECHA SOLICITUD DESPACHO"].iloc[0]
+        self.fecha_filtrado = fecha_filtrado
         latitudes = self.df["LATITUD"]
         longitudes = self.df["LONGITUD"]
 
@@ -413,9 +412,9 @@ class Entregas:
         # Abrimos el mapa para mostrar
         webbrowser.open("file://" + os.path.abspath(map_path))
 
-    def ejecutar_modelo(self):
+    def ejecutar_modelo(self, fecha_filtrado):
         # print(self.camiones)
-        self.cargar_datos()
+        self.cargar_datos(fecha_filtrado)
         K = self.sumar_vueltas()
         K = 25
         
@@ -522,9 +521,12 @@ class Entregas:
             try:
                 if os.path.exists(f"retiros/retiros-{self.fecha_filtrado}.xlsx"):
                     df_retiros = pd.read_excel(f"retiros/retiros-{self.fecha_filtrado}.xlsx")
-                    df_retiros = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
-                    if not df_retiros.empty:
-                        df_excel = pd.concat([df_excel, df_retiros])
+                    df_retiros_ext = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
+                    if not df_retiros_ext.empty:
+                        df_excel = pd.concat([df_excel, df_retiros_ext])
+                    df_retiros_clientes = df_retiros[df_retiros["EMPRESA EXT"] == 'NO APLICA']
+                    if not df_retiros_clientes.empty:
+                        df_excel = pd.concat([df_excel, df_retiros_clientes])
             except Exception as e:
                 print(e)
                 print("No se encontraron retiros.")
@@ -801,9 +803,12 @@ class Entregas:
                 try:
                     if os.path.exists(f"retiros/retiros-{self.fecha_filtrado}.xlsx"):
                         df_retiros = pd.read_excel(f"retiros/retiros-{self.fecha_filtrado}.xlsx")
-                        df_retiros = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
-                        if not df_retiros.empty:
-                            df_excel = pd.concat([df_excel, df_retiros])
+                        df_retiros_ext = df_retiros[df_retiros["EMPRESA EXT"] != 'NO APLICA']
+                        if not df_retiros_ext.empty:
+                            df_excel = pd.concat([df_excel, df_retiros_ext])
+                        df_retiros_clientes = df_retiros[df_retiros["EMPRESA EXT"] == 'NO APLICA']
+                        if not df_retiros_clientes.empty:
+                            df_excel = pd.concat([df_excel, df_retiros_clientes])
                 except:
                     print("No se encontraron retiros.")
                     
@@ -814,7 +819,6 @@ class Entregas:
                         f"resumen_despachos/{self.fecha_filtrado}/resumen-{i}_rutas.xlsx",
                         index=False,
                     )
-                    subir_resumen_despacho(df_excel)
                 except PermissionError:
                     print("No se pudo generar el excel de resumen despacho.")
 

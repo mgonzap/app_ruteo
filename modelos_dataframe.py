@@ -93,6 +93,7 @@ class ModeloDataframeFiltro(QSortFilterProxyModel):
 
 
 # Modelo encargado de filtrar filas con coordenadas incorrectas
+# TODO: elegir entre mostrar direccion o datos transporte externo
 class ModeloDataframeCoordenadas(ModeloDataframeFiltro):
     def __init__(
         self, allowed_column_names: Iterable[str], 
@@ -130,7 +131,7 @@ class ModeloDataframeVerificacion(ModeloDataframeFiltro):
         super().__init__(
             [
                 "N° CARPETA", "SERVICIO", "CLIENTE", "DIRECCION", 
-                "COMUNA", "TIPO DE ENTREGA", "EJECUTIVO", "DATOS TRANSPORTE EXTERNO"
+                "COMUNA", "TIPO DE ENTREGA", "EJECUTIVO"
             ]
         )
         

@@ -7,7 +7,8 @@ import georef
 import pytz
 
 # Para procesar datos de query / xlsx
-def obtener_dataframe_datos(fecha: str):
+# Funcion temporal para cargar excel, idealmente se manejaria por query
+def obtener_dataframe(fecha: str):
     """Procesa datos desde query, realizando un filtro por fecha
     para obtener las filas donde 'FECHA SOLICITUD DESPACHO' corresponda al día de mañana.
     Luego se entregan los datos como DataFrame a georef, quien añade columnas de latitud y longitud.
@@ -22,7 +23,7 @@ def obtener_dataframe_datos(fecha: str):
     print("Fecha de hoy:", date.today().strftime('%d-%m-%Y'))
     print("Fecha a filtrar:", fecha)
     
-    df = obtener_datos(fecha)
+    df = procesar_query(fecha)
     
     if df.empty:
         return df
@@ -34,7 +35,6 @@ def obtener_dataframe_datos(fecha: str):
     
     # retiros directamente en bodega, por lo tanto no lo georreferenciamos
     # Filtrar y guardar en su propio DataFrame
-
     df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])].copy()
     
     df_retiros = df_retiros.rename(columns={
@@ -46,9 +46,7 @@ def obtener_dataframe_datos(fecha: str):
         "DIRECCION": "DIRECCIÓN",
         "DATOS TRANSPORTE EXTERNO": "EMPRESA EXT"
     })
-
     df_retiros['RUTA'] = 'RETIRO'
-
     df_retiros['(m³) TOTAL RUTA'] = df_retiros['(m³)']
     df_retiros['ORDEN'] = 0
     df_retiros['CAMIÓN'] = df_retiros['TIPO DE ENTREGA']
@@ -93,7 +91,6 @@ def obtener_dataframe_datos(fecha: str):
         "ESTADO REVISIÓN"
     ]]
     
-
     try:
         if not os.path.exists('retiros'):
             os.makedirs('retiros')
@@ -101,7 +98,6 @@ def obtener_dataframe_datos(fecha: str):
     except PermissionError:
         print(f"No se pudo escribir 'retiros/retiros-{fecha}.xlsx', permiso denegado.")
     
-
     try:
         if not os.path.exists('retiros'):
             os.makedirs('retiros')
@@ -123,56 +119,6 @@ def obtener_dataframe_datos(fecha: str):
     df = georef.pasar_a_coordenadas(df)
     return df
 
-def obtener_dataframe_entregas_clientes(fecha: str, lista_clientes: list[str], df_principal: pd.DataFrame):
-    """Procesa datos desde query, realizando un filtro por fecha
-    para obtener las filas donde 'FECHA SOLICITUD DESPACHO' corresponda al día de mañana.
-    Luego se entregan los datos como DataFrame a georef, quien añade columnas de latitud y longitud.
-
-    Args:
-        filename (_type_, opcional): El nombre del archivo xlsx a procesar. Si no hay nombre, es None y se revisa por query.
-
-    Returns:
-        pd.DataFrame: Un DataFrame que incluye las columnas de latitud y longitud georreferenciadas.
-    """
-    
-    print("Fecha de hoy:", date.today().strftime('%d-%m-%Y'))
-    print("Fecha a filtrar:", fecha)
-    print("Lista de clientes:", lista_clientes)
-    
-    df = obtener_entregas_clientes(fecha, lista_clientes, df_principal)
-    
-    if df.empty:
-        return df
-    
-    try:
-        df.to_excel('test/excel_procesado_clientes.xlsx', index=False)
-    except PermissionError:
-        print("No se pudo escribir 'test/excel_procesado_clientes.xlsx', permiso denegado.")
-    
-    # retiros directamente en bodega, por lo tanto no lo georreferenciamos
-    # Filtrar y guardar en su propio DataFrame
-    df_retiros = df[df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])]
-    try:
-        if not os.path.exists('retiros'):
-            os.makedirs('retiros')
-        df_retiros.to_excel(f"retiros/retiros-{fecha}-clientes.xlsx", index=False)
-    except PermissionError:
-        print(f"No se pudo escribir 'retiros/retiros-{fecha}-clientes.xlsx', permiso denegado.")
-    
-    df = df[~df["TIPO DE ENTREGA"].isin(['RETIRA TRANS.EXTERNO', 'RETIRA CLIENTE'])]
-    
-    # para poder concatenar los n de SERVICIO de las entregas agrupadas.
-    df.to_excel('test/pre_agrupar_clientes.xlsx', index=False)
-    df['SERVICIO'] = df['SERVICIO'].astype(str)
-    df = agrupar_entregas(df)
-    df.to_excel('test/post_agrupar_clientes.xlsx', index=False)
-    
-    # Procesamos los datos mediante georef
-    # obteniendo un DataFrame que incluye coordenadas asociadas a direccion
-    df.reset_index(drop=True, inplace=True)
-    df = georef.pasar_a_coordenadas(df)
-    return df
-
 def agrupar_entregas(df: pd.DataFrame):
     # TODO: ahora agruparemos por DIRECCIÓN y CLIENTE, concatenamos todo lo q no sea BULTOS VOLUMEN PESO
 
@@ -181,15 +127,13 @@ def agrupar_entregas(df: pd.DataFrame):
     cuenta_repeticiones = df['DIRECCION'].value_counts()
   
     direcciones_repetidas = cuenta_repeticiones.loc[cuenta_repeticiones > 1].index.tolist()
-    #print("direcciones repetidas:", direcciones_repetidas)
+    #print(direcciones_repetidas)
     if len(direcciones_repetidas) == 0:
       return df
     
     df_duplicados = df[df['DIRECCION'].isin(direcciones_repetidas)]
-    print(df_duplicados)
     df_con_carpeta = df_duplicados[df_duplicados['N° CARPETA'].notna()]
-    print(df_con_carpeta)
-    
+  
     filas = []
     # Mantenemos la fila que tenga su N° CARPETA, los otros se agrupan a el, mientras coincidan en direccion, etc
     # TODO: no usar iterrows, muy lento
@@ -203,9 +147,6 @@ def agrupar_entregas(df: pd.DataFrame):
         similares = df[(df['DIRECCION'] == fila['DIRECCION'])
                        & (df['COMUNA'] == fila['COMUNA'])
                        & (df['CLIENTE'] == fila['CLIENTE'])]
-        
-        if similares.empty:
-            continue
 
         # si se encuentran elementos así, se suma 'N° BULTOS', 'PESO' y 'VOLUMEN'
         # similares no debería ser empty nunca, puesto que siempre estará el elemento mismo
@@ -230,38 +171,15 @@ def agrupar_entregas(df: pd.DataFrame):
     df = pd.concat([df, df_filas])
     return df
 
-def obtener_datos(fecha_filtrado: str) -> pd.DataFrame:
-    df_query = query_datos(fecha_filtrado)
-    
-    return procesar_query(df_query)
 
-def obtener_entregas_clientes(fecha_filtrado: str, lista_clientes: list[str], df_original) -> pd.DataFrame:
-    df_query = query_despachos_clientes(fecha_filtrado, lista_clientes)
-
-    df = procesar_query(df_query)
-    
-    if df.empty:
-        return df
-    
-    # obtenemos filas sin direccion ni datos transporte externo.
-    filas_sin_direccion = df[(df['DIRECCION'] == ' , , ') & (df['DATOS TRANSPORTE EXTERNO'] == 'NO APLICA')]
-    
-    # TODO: lento, cambiar a algo mas eficiente
-    for idx, row in filas_sin_direccion.iterrows():
-        # buscamos la direccion asociada a otros despachos del mismo cliente
-        mismo_cliente = df_original[df_original['CLIENTE'] == row['CLIENTE']]
-        row[['TIPO DE ENTREGA', 'DIRECCION', 'COMUNA', 'DATOS TRANSPORTE EXTERNO']] = mismo_cliente.iloc[0][['TIPO DE ENTREGA', 'DIRECCION', 'COMUNA', 'DATOS TRANSPORTE EXTERNO']]
-        # la aplicamos
-        df.loc[idx] = row
-    
-    return df
-    
-def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
-    """Recibe un DataFrame construido desde una query a la base de datos y la procesa.
+def procesar_query(fecha) -> pd.DataFrame:
+    """Ejecuta la query a la base de datos y la procesa en un DataFrame similar a los excel de despacho
 
     Returns:
         pd.DataFrame: un DataFrame conteniendo los datos procesados de la query
     """  
+    # Realizamos la query y la recibimos en forma de DataFrame
+    df_query = query_datos(fecha)
     
     # timezone Chile
     tz_chile = pytz.timezone('Chile/Continental')
@@ -382,12 +300,13 @@ def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
     , axis=1)
     
     # CLIENTE
+    # formato es "('fk_cliente') 'fk_cliente_razon_social'"
     df_agrupado['cliente'] = df_agrupado[['fk_cliente', 'fk_cliente_razon_social']].apply(
         lambda fila: f"({fila['fk_cliente']}) {fila['fk_cliente_razon_social'].strip()}"
     , axis=1)
     
     
-    # FECHA SOLICITUD DESPACHO
+    # TODO: FECHA SOLICITUD DESPACHO (?)
     df_agrupado['fecha_solicitud'] = df_agrupado[['fecha_despacho_retiro', 'fecha_fin_despacho_retiro']].apply(
         lambda fila: f"{fila['fecha_despacho_retiro'].strftime('%d-%m-%Y %H:%M')} / {fila['fecha_fin_despacho_retiro'].strftime('%H:%M')}" 
         if pd.notna(fila['fecha_fin_despacho_retiro']) and pd.notna(fila['fecha_despacho_retiro'])
@@ -395,7 +314,7 @@ def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
         else "S/I"
     , axis=1)
 
-    # FECHA PROG DESPACHO
+    # FECHA PROG DESPACHO (?)
     df_agrupado['fecha_programada'] = df_agrupado['fecha_programada'].apply(
         lambda fecha: fecha.strftime('%d-%m-%Y %H:%M') if pd.notna(fecha)
         else 'S/I'
@@ -431,7 +350,7 @@ def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
     
     # al final queremos un DataFrame igual al excel de programacion de despacho que se está generando actualmente
     
-    
+    # NAVE = 'nave_nombre'
     df_final = pd.DataFrame()
     columnas_final = ['NAVE', 'CONTENEDOR', 'ETA', 'F.DESCONSOLIDADO',
                       'N° CARPETA', 'ESTADO PAGO', 'TIPO DE ENTREGA', 'SERVICIO', 
@@ -439,7 +358,7 @@ def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
                       'QUIEN PROGRAMA', 'DIRECCION', 'COMUNA', 'CONTACTO', 
                       'TELEF. CONTACTO', 'CLIENTE', 'FECHA SOLICITUD DESPACHO', 'FECHA PROG DESPACHO', 
                       'FECHA ENTREGA', 'DATOS CONTACTO RETIRO', 'DATOS TRANSPORTE EXTERNO', 'OBS.CLIENTE', 
-                      'ESTADO DE ENTREGA', 'OBSERVACIONES', 'CONDUCTOR', 'FECHA INGRESO', 'fecha_despacho_retiro', 'fk_cliente']
+                      'ESTADO DE ENTREGA', 'OBSERVACIONES', 'CONDUCTOR', 'FECHA INGRESO', 'fecha_despacho_retiro']
     
     columnas_agrupado = ['nave_nombre', 'contenedor', 'fecha_llegada', 'fecha_desconsolidado', 
                          'n_carpeta', 'estado_pago', 'tipo_de_entrega', 'fk_consolidado',
@@ -447,7 +366,7 @@ def procesar_query(df_query: pd.DataFrame) -> pd.DataFrame:
                          'quien', 'fk_direccion_completa', 'fk_comuna_nombre', 'nombre_contacto', 
                          'telefono_contacto', 'cliente', 'fecha_solicitud', 'fecha_programada',
                          'fecha_entrega', 'retiro', 'emp_ext', 'obs_cliente', 
-                         'estado_entrega', 'observaciones', 'conductor', 'fecha_registro', 'fecha_despacho_retiro', 'fk_cliente']
+                         'estado_entrega', 'observaciones', 'conductor', 'fecha_registro', 'fecha_despacho_retiro']
     
     df_final[columnas_final] = df_agrupado[columnas_agrupado]
     
